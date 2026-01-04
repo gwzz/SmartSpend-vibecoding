@@ -1,0 +1,5 @@
+{
+  "name": "SmartSpend",
+  "description": "A smart family expense tracker focusing on amortization (daily cost) and consumption reflection.",
+  "requestFramePermissions": []
+}
