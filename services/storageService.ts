@@ -111,10 +111,8 @@ export const addTransaction = async (tx: Transaction) => {
   const userId = await getUserId();
   if (!userId) return;
 
-  // If ID is random math string, let's keep it, or let Supabase gen UUID.
-  // We'll trust the ID passed from UI for now to maintain optimistic UI patterns if added later.
   const payload = {
-    // id: tx.id, // Supabase will auto-gen UUID if we omit this, but passing it is fine if UUID valid
+    id: tx.id,
     user_id: userId,
     name: tx.name,
     amount: tx.amount,
