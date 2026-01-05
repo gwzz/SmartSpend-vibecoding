@@ -8,13 +8,11 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsConfirmation, setNeedsConfirmation] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setNeedsConfirmation(false);
 
     try {
       if (isSignUp) {
@@ -24,14 +22,15 @@ const LoginPage: React.FC = () => {
         });
         if (error) throw error;
         
+        // If signup is successful
         if (data.session) {
-            // Session exists, user is logged in automatically
-        } else if (data.user) {
-            // User created, but no session -> Email confirmation required
-            // We set error/warning immediately to guide the user
-            setError("Registration successful! Please check your email to confirm your account before logging in.");
-            setNeedsConfirmation(true);
-            setIsSignUp(false); // Switch to login mode so they can try after clicking link
+            // Session exists, user is logged in automatically by AuthContext
+        } else {
+            // User created.
+            // If email confirmation is disabled in Supabase, this block might not even be hit if session is returned.
+            // If it is hit, we just guide them to sign in.
+            alert("Account created successfully! Please sign in.");
+            setIsSignUp(false);
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
@@ -44,10 +43,7 @@ const LoginPage: React.FC = () => {
       console.error("Auth Error:", err);
       const msg = (err.message || "").toLowerCase();
       
-      if (msg.includes("not confirmed") || msg.includes("email link is invalid")) {
-          setError("Your email address has not been confirmed yet.");
-          setNeedsConfirmation(true);
-      } else if (msg.includes("invalid login credentials")) {
+      if (msg.includes("invalid login credentials")) {
           setError("Invalid email or password.");
       } else if (msg.includes("user already registered")) {
           setError("This email is already registered. Please sign in.");
@@ -55,33 +51,6 @@ const LoginPage: React.FC = () => {
       } else {
           setError(err.message || "An unexpected error occurred.");
       }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResendConfirmation = async () => {
-    if (!email) {
-        setError("Please enter your email address to resend the confirmation.");
-        return;
-    }
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const { error } = await supabase.auth.resend({
-          type: 'signup',
-          email: email,
-      });
-      
-      if (error) throw error;
-      
-      alert("Confirmation email resent! Please check your inbox (and spam folder).");
-      setError("Confirmation email sent. Please check your inbox.");
-    } catch (err: any) {
-      console.error("Resend Error:", err);
-      // Rate limit errors or others
-      setError(err.message || "Failed to resend confirmation email.");
     } finally {
       setLoading(false);
     }
@@ -124,18 +93,8 @@ const LoginPage: React.FC = () => {
             </div>
 
             {error && (
-              <div className={`text-sm p-3 rounded-lg flex flex-col gap-2 ${needsConfirmation ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-500'}`}>
+              <div className="bg-red-50 text-red-500 text-sm p-3 rounded-lg">
                 <span>{error}</span>
-                {needsConfirmation && (
-                    <button 
-                        type="button" 
-                        onClick={handleResendConfirmation}
-                        disabled={loading}
-                        className="text-left font-semibold underline hover:text-yellow-800 transition-colors"
-                    >
-                        {loading ? 'Sending...' : 'Resend Confirmation Email'}
-                    </button>
-                )}
               </div>
             )}
 
@@ -149,7 +108,6 @@ const LoginPage: React.FC = () => {
               onClick={() => {
                   setIsSignUp(!isSignUp);
                   setError(null);
-                  setNeedsConfirmation(false);
               }}
               className="text-sm text-[#007AFF] font-medium hover:underline"
             >
