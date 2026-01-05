@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smartspend-v3';
+const CACHE_NAME = 'smartspend-v5';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

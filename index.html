@@ -15,9 +15,9 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
     "react-router-dom": "https://esm.sh/react-router-dom@^7.11.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "recharts": "https://esm.sh/recharts@^3.6.0",
@@ -32,15 +32,29 @@
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
     <script>
-      // Register Service Worker for PWA
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          // Use absolute path to ensure correct registration scope on Vercel
-          navigator.serviceWorker.register('/service-worker.js')
-            .then(reg => console.log('Service Worker registered', reg))
-            .catch(err => console.log('Service Worker registration failed', err));
-        });
-      }
+      // In development/preview environments, Service Workers can cause origin issues and caching problems.
+      // We explicitly unregister them to ensure the app loads the latest version.
+      window.addEventListener('load', function() {
+        if ('serviceWorker' in navigator) {
+          try {
+            navigator.serviceWorker.getRegistrations()
+              .then(function(registrations) {
+                for(let registration of registrations) {
+                  registration.unregister().catch(function(e) {
+                    // Ignore specific unregister errors
+                    console.debug('SW unregister suppressed:', e);
+                  });
+                }
+              })
+              .catch(function(err) {
+                // Silently ignore SW access errors in preview/sandboxed envs
+                console.debug('SW registry access suppressed:', err);
+              });
+          } catch (e) {
+            console.debug('SW access suppressed:', e);
+          }
+        }
+      });
     </script>
   </body>
 </html>

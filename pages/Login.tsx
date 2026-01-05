@@ -1,13 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { Button } from '../components/ui';
+import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,11 +35,9 @@ const LoginPage: React.FC = () => {
         
         // If signup is successful
         if (data.session) {
-            // Session exists, user is logged in automatically by AuthContext
+            navigate('/');
         } else {
             // User created.
-            // If email confirmation is disabled in Supabase, this block might not even be hit if session is returned.
-            // If it is hit, we just guide them to sign in.
             alert("Account created successfully! Please sign in.");
             setIsSignUp(false);
         }
@@ -38,6 +47,7 @@ const LoginPage: React.FC = () => {
           password,
         });
         if (error) throw error;
+        navigate('/');
       }
     } catch (err: any) {
       console.error("Auth Error:", err);

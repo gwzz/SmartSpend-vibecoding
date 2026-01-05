@@ -9,55 +9,68 @@ const getUserId = async () => {
 };
 
 // --- Initialization ---
-// For Supabase, we check if default categories/members exist for the user, if not, create them.
+// Checks if the user has data. If not, seeds the database with initial categories and members.
 export const initStoragePersistence = async () => {
   const userId = await getUserId();
   if (!userId) return;
 
-  // Check Members
-  const { count: memberCount } = await supabase
-    .from('members')
-    .select('*', { count: 'exact', head: true });
-  
-  if (memberCount === 0) {
-     const initMembers = INITIAL_MEMBERS.map(m => ({
-         id: m.id,
-         user_id: userId,
-         name: m.name,
-         avatar: m.avatar
-     }));
-     await supabase.from('members').insert(initMembers);
-  }
+  try {
+    // 1. Check & Seed Members
+    const { count: memberCount, error: memberError } = await supabase
+      .from('members')
+      .select('*', { count: 'exact', head: true });
+    
+    if (!memberError && (memberCount === null || memberCount === 0)) {
+       console.log("Seeding default members...");
+       const initMembers = INITIAL_MEMBERS.map(m => ({
+           id: m.id,
+           user_id: userId,
+           name: m.name,
+           avatar: m.avatar
+       }));
+       const { error: insertError } = await supabase.from('members').insert(initMembers);
+       if (insertError) console.error("Error seeding members:", insertError.message);
+    }
 
-  // Check Categories
-  const { count: catCount } = await supabase
-    .from('categories')
-    .select('*', { count: 'exact', head: true });
+    // 2. Check & Seed Categories
+    const { count: catCount, error: catError } = await supabase
+      .from('categories')
+      .select('*', { count: 'exact', head: true });
 
-  if (catCount === 0) {
-      const initCats = INITIAL_CATEGORIES.map(c => ({
-          id: c.id,
-          user_id: userId,
-          name: c.name,
-          icon: c.icon,
-          color: c.color
-      }));
-      await supabase.from('categories').insert(initCats);
+    if (!catError && (catCount === null || catCount === 0)) {
+        console.log("Seeding default categories...");
+        const initCats = INITIAL_CATEGORIES.map(c => ({
+            id: c.id,
+            user_id: userId,
+            name: c.name,
+            icon: c.icon,
+            color: c.color
+        }));
+        const { error: insertError } = await supabase.from('categories').insert(initCats);
+        if (insertError) console.error("Error seeding categories:", insertError.message);
+    }
+  } catch (err) {
+    console.error("Initialization Error:", err);
   }
 };
 
 // --- Transactions ---
 
 export const getTransactions = async (): Promise<Transaction[]> => {
+  const userId = await getUserId();
+  if (!userId) return [];
+
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
-    .order('timestamp', { ascending: false }); // Ensure descending order
+    .order('timestamp', { ascending: false });
 
   if (error) {
-    console.error('Error fetching transactions:', error);
+    console.error('Error fetching transactions:', error.message);
     return [];
   }
+
+  if (!data) return [];
 
   return data.map((t: any) => ({
     id: t.id,
@@ -69,13 +82,16 @@ export const getTransactions = async (): Promise<Transaction[]> => {
     endDate: t.end_date || undefined,
     isWaste: t.is_waste,
     note: t.note || '',
-    timestamp: parseInt(t.timestamp)
+    timestamp: typeof t.timestamp === 'string' ? parseInt(t.timestamp) : t.timestamp
   }));
 };
 
 export const getTransactionById = async (id: string): Promise<Transaction | undefined> => {
   const { data, error } = await supabase.from('transactions').select('*').eq('id', id).single();
-  if (error || !data) return undefined;
+  if (error || !data) {
+    if (error) console.error("Error fetching transaction by ID:", error.message);
+    return undefined;
+  }
   
   return {
     id: data.id,
@@ -87,7 +103,7 @@ export const getTransactionById = async (id: string): Promise<Transaction | unde
     endDate: data.end_date || undefined,
     isWaste: data.is_waste,
     note: data.note || '',
-    timestamp: parseInt(data.timestamp)
+    timestamp: typeof data.timestamp === 'string' ? parseInt(data.timestamp) : data.timestamp
   };
 };
 
@@ -95,12 +111,10 @@ export const addTransaction = async (tx: Transaction) => {
   const userId = await getUserId();
   if (!userId) return;
 
-  // Remove ID from insert payload if we want Supabase to auto-gen UUIDs, 
-  // but keeping it client-side generated is fine too if the table accepts it.
-  // Using client-generated ID from previous logic:
-  
+  // If ID is random math string, let's keep it, or let Supabase gen UUID.
+  // We'll trust the ID passed from UI for now to maintain optimistic UI patterns if added later.
   const payload = {
-    // id: tx.id, // Optional: let Supabase generate UUID if needed, but keeping consistent
+    // id: tx.id, // Supabase will auto-gen UUID if we omit this, but passing it is fine if UUID valid
     user_id: userId,
     name: tx.name,
     amount: tx.amount,
@@ -114,7 +128,7 @@ export const addTransaction = async (tx: Transaction) => {
   };
 
   const { error } = await supabase.from('transactions').insert([payload]);
-  if (error) console.error("Add Tx Error", error);
+  if (error) console.error("Add Tx Error:", error.message);
 };
 
 export const updateTransaction = async (tx: Transaction) => {
@@ -131,19 +145,24 @@ export const updateTransaction = async (tx: Transaction) => {
   };
 
   const { error } = await supabase.from('transactions').update(payload).eq('id', tx.id);
-  if (error) console.error("Update Tx Error", error);
+  if (error) console.error("Update Tx Error:", error.message);
 };
 
 export const deleteTransaction = async (id: string) => {
   const { error } = await supabase.from('transactions').delete().eq('id', id);
-  if (error) console.error("Delete Tx Error", error);
+  if (error) console.error("Delete Tx Error:", error.message);
 };
 
 // --- Categories ---
 
 export const getCategories = async (): Promise<Category[]> => {
   const { data, error } = await supabase.from('categories').select('*');
-  if (error) return INITIAL_CATEGORIES;
+  if (error) {
+    console.warn("Fetch Categories Error (using defaults):", error.message);
+    return INITIAL_CATEGORIES;
+  }
+  if (!data || data.length === 0) return INITIAL_CATEGORIES;
+
   return data.map((c: any) => ({
       id: c.id,
       name: c.name,
@@ -185,7 +204,12 @@ export const deleteCategory = async (id: string) => {
 
 export const getMembers = async (): Promise<Member[]> => {
     const { data, error } = await supabase.from('members').select('*');
-    if (error) return INITIAL_MEMBERS;
+    if (error) {
+      console.warn("Fetch Members Error (using defaults):", error.message);
+      return INITIAL_MEMBERS;
+    }
+    if (!data || data.length === 0) return INITIAL_MEMBERS;
+
     return data.map((m: any) => ({
         id: m.id,
         name: m.name,
@@ -225,7 +249,15 @@ export const deleteMember = async (id: string) => {
 const DEFAULT_SETTINGS: AppSettings = { language: 'en', currency: 'USD' };
 
 export const getSettings = async (): Promise<AppSettings> => {
-    const { data } = await supabase.from('user_settings').select('*').single();
+    const userId = await getUserId();
+    if (!userId) return DEFAULT_SETTINGS;
+
+    const { data, error } = await supabase.from('user_settings').select('*').eq('user_id', userId).single();
+    
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
+        console.warn("Error fetching settings:", error.message);
+    }
+    
     if (data) {
         return { language: data.language as any, currency: data.currency as any };
     }
@@ -237,16 +269,17 @@ export const saveSettings = async (settings: AppSettings) => {
     if (!userId) return;
 
     // Upsert settings
-    await supabase.from('user_settings').upsert({
+    const { error } = await supabase.from('user_settings').upsert({
         user_id: userId,
         language: settings.language,
-        currency: settings.currency
+        currency: settings.currency,
+        updated_at: new Date().toISOString()
     });
+    
+    if (error) console.error("Save Settings Error:", error.message);
 };
 
 // --- Utils (Export/Import/Calc) ---
-// Note: Export/Import JSON logic is complicated with Database.
-// For now, export fetches all data dynamically.
 
 export const exportTransactionsToCSV = async () => {
     const transactions = await getTransactions();
