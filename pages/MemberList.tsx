@@ -11,15 +11,20 @@ const MemberList: React.FC = () => {
   const { t } = useSettings();
   const [members, setMembers] = useState<Member[]>([]);
 
+  const loadData = async () => {
+    const data = await getMembers();
+    setMembers(data);
+  };
+
   useEffect(() => {
-    setMembers(getMembers());
+    loadData();
   }, []);
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (confirm(t('memberDeleteWarn'))) {
-      deleteMember(id);
-      setMembers(getMembers());
+      await deleteMember(id);
+      loadData();
     }
   };
 

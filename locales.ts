@@ -1,3 +1,4 @@
+
 export const translations = {
   en: {
     home: "Home",
@@ -81,6 +82,13 @@ export const translations = {
     importConfirm: "Restoring data will OVERWRITE all current data. Are you sure?",
     importSuccess: "Data restored successfully!",
     importError: "Invalid file format.",
+    installGuide: "Install App",
+    installInstructions: "Installation Instructions",
+    iosStep1: "1. Tap the Share button (box with arrow) in Safari.",
+    iosStep2: "2. Scroll down and tap 'Add to Home Screen'.",
+    iosStep3: "3. Tap 'Add' to finish.",
+    androidStep1: "1. Tap the browser menu (three dots).",
+    androidStep2: "2. Tap 'Install App' or 'Add to Home Screen'.",
   },
   zh: {
     home: "首页",
@@ -157,12 +165,19 @@ export const translations = {
     overview: "总览",
     byMember: "按成员",
     byCategory: "按分类",
-    totalFor: "总支出："
+    totalFor: "总支出：",
     backupRestore: "备份与恢复",
     exportBackup: "备份数据 (JSON)",
     importBackup: "恢复数据 (JSON)",
     importConfirm: "恢复数据将【覆盖】当前所有数据，确定吗？",
     importSuccess: "数据恢复成功！",
     importError: "文件格式无效。",
+    installGuide: "安装应用",
+    installInstructions: "安装说明",
+    iosStep1: "1. 点击 Safari 底部菜单栏的分享按钮 (带箭头的方框)。",
+    iosStep2: "2. 向下滑动并点击“添加到主屏幕”。",
+    iosStep3: "3. 点击右上角的“添加”即可。",
+    androidStep1: "1. 点击浏览器菜单 (三个点)。",
+    androidStep2: "2. 点击“安装应用”或“添加到主屏幕”。",
   }
 };

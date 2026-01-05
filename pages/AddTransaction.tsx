@@ -27,31 +27,35 @@ const AddTransaction: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
 
   useEffect(() => {
-    setCategories(getCategories());
-    const loadedMembers = getMembers();
-    setMembers(loadedMembers);
+    const loadData = async () => {
+        const cats = await getCategories();
+        setCategories(cats);
+        const loadedMembers = await getMembers();
+        setMembers(loadedMembers);
+        
+        if (!id) {
+            const me = loadedMembers.find(m => m.name === 'Me');
+            if (me) setSelectedMembers([me.id]);
+        }
     
-    if (!id) {
-        const me = loadedMembers.find(m => m.name === 'Me');
-        if (me) setSelectedMembers([me.id]);
-    }
-
-    if (id) {
-        const tx = getTransactionById(id);
-        if (tx) {
-            setName(tx.name || '');
-            setAmount(tx.amount.toString());
-            setCategoryId(tx.categoryId);
-            setSelectedMembers(tx.memberIds);
-            setDate(tx.date);
-            setIsWaste(tx.isWaste);
-            setNote(tx.note);
-            if (tx.endDate) {
-                setIsLongTerm(true);
-                setEndDate(tx.endDate);
+        if (id) {
+            const tx = await getTransactionById(id);
+            if (tx) {
+                setName(tx.name || '');
+                setAmount(tx.amount.toString());
+                setCategoryId(tx.categoryId);
+                setSelectedMembers(tx.memberIds);
+                setDate(tx.date);
+                setIsWaste(tx.isWaste);
+                setNote(tx.note);
+                if (tx.endDate) {
+                    setIsLongTerm(true);
+                    setEndDate(tx.endDate);
+                }
             }
         }
-    }
+    };
+    loadData();
   }, [id]);
 
   const toggleMember = (mId: string) => {
@@ -60,8 +64,14 @@ const AddTransaction: React.FC = () => {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!amount || !categoryId || selectedMembers.length === 0) return;
+
+    let timestamp = Date.now();
+    if (id) {
+        const existingTx = await getTransactionById(id);
+        if (existingTx) timestamp = existingTx.timestamp;
+    }
 
     const tx: Transaction = {
       id: id || generateId(),
@@ -73,13 +83,13 @@ const AddTransaction: React.FC = () => {
       endDate: isLongTerm && endDate ? endDate : undefined,
       isWaste,
       note,
-      timestamp: id ? (getTransactionById(id)?.timestamp || Date.now()) : Date.now()
+      timestamp: timestamp
     };
 
     if (id) {
-        updateTransaction(tx);
+        await updateTransaction(tx);
     } else {
-        addTransaction(tx);
+        await addTransaction(tx);
     }
     navigate('/');
   };

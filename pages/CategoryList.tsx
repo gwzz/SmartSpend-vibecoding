@@ -11,15 +11,20 @@ const CategoryList: React.FC = () => {
   const { t } = useSettings();
   const [categories, setCategories] = useState<Category[]>([]);
 
+  const loadData = async () => {
+    const data = await getCategories();
+    setCategories(data);
+  };
+
   useEffect(() => {
-    setCategories(getCategories());
+    loadData();
   }, []);
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (confirm(t('deleteConfirm'))) {
-      deleteCategory(id);
-      setCategories(getCategories());
+      await deleteCategory(id);
+      loadData();
     }
   };
 

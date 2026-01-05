@@ -31,16 +31,17 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-        const cats = getCategories();
-        const mems = getMembers();
+    const fetchData = async () => {
+        const cats = await getCategories();
+        const mems = await getMembers();
         setCategories(cats);
         setMembers(mems);
 
         if (editId) {
-            const tx = getTransactionById(editId);
+            const tx = await getTransactionById(editId);
             if (tx) {
                 setName(tx.name || '');
                 setAmount(tx.amount.toString());
@@ -75,6 +76,10 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
             setNote('');
             setShowOptions(false);
         }
+    };
+
+    if (isOpen) {
+        fetchData();
     }
   }, [isOpen, editId]);
 
@@ -84,8 +89,9 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
     );
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!amount || !categoryId || selectedMembers.length === 0) return;
+    setLoading(true);
 
     const tx: Transaction = {
       id: editId || generateId(),
@@ -97,14 +103,15 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
       endDate: isLongTerm && endDate ? endDate : undefined,
       isWaste,
       note,
-      timestamp: editId ? (getTransactionById(editId)?.timestamp || Date.now()) : Date.now()
+      timestamp: editId ? (await getTransactionById(editId))?.timestamp || Date.now() : Date.now()
     };
 
     if (editId) {
-        updateTransaction(tx);
+        await updateTransaction(tx);
     } else {
-        addTransaction(tx);
+        await addTransaction(tx);
     }
+    setLoading(false);
     onClose();
   };
 
@@ -290,10 +297,10 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
 
         <Button 
             onClick={handleSave} 
-            disabled={!amount || !categoryId || selectedMembers.length === 0}
+            disabled={!amount || !categoryId || selectedMembers.length === 0 || loading}
             className={`${(!amount || !categoryId) ? 'opacity-30' : ''}`}
         >
-            {editId ? t('update') : t('save')}
+            {loading ? 'Saving...' : (editId ? t('update') : t('save'))}
         </Button>
     </Modal>
   );

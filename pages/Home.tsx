@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getTransactions, getCategories, getDailyCostForDate, deleteTransaction, exportBackupJSON } from '../services/storageService';
 import { Transaction, Category } from '../types';
-import { Card, Badge, ListGroup, ListItem, FloatingActionButton } from '../components/ui';
-import { Calendar, Trash2, Search, XCircle, Plus, Download } from 'lucide-react';
+import { Card, ListItem, FloatingActionButton } from '../components/ui';
+import { Trash2, Search, XCircle, Plus, Download } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, Cell } from 'recharts';
 import AddTransactionModal from '../components/AddTransactionModal';
@@ -25,9 +25,9 @@ const HomePage: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const loadData = () => {
-    const txs = getTransactions();
-    const cats = getCategories();
+  const loadData = async () => {
+    const txs = await getTransactions();
+    const cats = await getCategories();
     setTransactions(txs);
     setCategories(cats);
 
@@ -68,10 +68,10 @@ const HomePage: React.FC = () => {
       if (!isModalOpen) loadData();
   }, [isModalOpen]);
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (confirm(t('deleteConfirm'))) {
-      deleteTransaction(id);
+      await deleteTransaction(id);
       loadData();
     }
   };
@@ -115,9 +115,9 @@ const HomePage: React.FC = () => {
   const todayStr = new Date().toISOString().split('T')[0];
 
   return (
-    <div className="pt-safe pb-24">
-      {/* iOS Large Title Header */}
-      <header className="px-4 pt-4 pb-2 bg-[#F2F2F7] sticky top-0 z-40">
+    <div className="pt-safe pb-24 md:pb-8 md:pt-4">
+      {/* Header */}
+      <header className="px-4 md:px-6 pt-4 pb-2 bg-[#F2F2F7] sticky top-0 md:static z-40">
         <div className="flex justify-between items-end mb-2">
           <div>
             <p className="text-[13px] font-semibold text-slate-500 uppercase">
@@ -126,6 +126,14 @@ const HomePage: React.FC = () => {
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{t('today')}</h1>
           </div>
           <div className="flex items-center gap-2">
+            {/* Desktop Add Button (Visible on md+) */}
+            <button 
+                onClick={handleAdd}
+                className="hidden md:flex h-9 px-4 bg-[#007AFF] rounded-full items-center justify-center text-white shadow-sm hover:bg-[#005ec4] transition-colors gap-2"
+            >
+                <Plus size={18} />
+                <span className="text-sm font-semibold">{t('add')}</span>
+            </button>
             <button 
                 onClick={exportBackupJSON}
                 className="h-9 w-9 bg-white rounded-full flex items-center justify-center text-slate-500 shadow-sm border border-slate-200 active:scale-95 transition-transform"
@@ -140,56 +148,64 @@ const HomePage: React.FC = () => {
         </div>
       </header>
 
-      <div className="px-4 space-y-4">
-        {/* Last 7 Days Chart */}
-        <Card className="p-4">
-            <h2 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">{t('last7Days')}</h2>
-            <div className="h-44 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
-                        <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                            {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.date === todayStr ? '#007AFF' : '#E2E8F0'} />
-                            ))}
-                        </Bar>
-                        <Tooltip 
-                            cursor={{fill: 'transparent'}}
-                            content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                return (
-                                    <div className="bg-slate-900 text-white text-xs py-1 px-2 rounded shadow-lg">
-                                    {formatCurrency(payload[0].value as number)}
-                                    </div>
-                                );
-                                }
-                                return null;
-                            }}
-                        />
-                        <XAxis 
-                            dataKey="day" 
-                            axisLine={false} 
-                            tickLine={false} 
-                            tick={{fontSize: 12, fill: '#94a3b8'}} 
-                            dy={5}
-                            interval={0}
-                        />
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
-        </Card>
+      <div className="px-4 md:px-6 space-y-4 md:space-y-6">
+        
+        {/* Dashboard Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Last 7 Days Chart */}
+            <Card className="p-4 md:col-span-2">
+                <h2 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">{t('last7Days')}</h2>
+                <div className="h-44 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                            <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.date === todayStr ? '#007AFF' : '#E2E8F0'} />
+                                ))}
+                            </Bar>
+                            <Tooltip 
+                                cursor={{fill: 'transparent'}}
+                                content={({ active, payload }) => {
+                                    if (active && payload && payload.length) {
+                                    return (
+                                        <div className="bg-slate-900 text-white text-xs py-1 px-2 rounded shadow-lg">
+                                        {formatCurrency(payload[0].value as number)}
+                                        </div>
+                                    );
+                                    }
+                                    return null;
+                                }}
+                            />
+                            <XAxis 
+                                dataKey="day" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{fontSize: 12, fill: '#94a3b8'}} 
+                                dy={5}
+                                interval={0}
+                            />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </Card>
 
-        {/* Cash Flow Card */}
-        <Card className="p-4 flex items-center justify-between">
-           <div>
-              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('cashFlow')}</p>
-              <p className="text-[10px] text-slate-400">{t('spentToday')}</p>
-           </div>
-           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{formatCurrency(cashFlowToday)}</h2>
-        </Card>
+            {/* Cash Flow Card */}
+            <Card className="p-4 flex flex-row md:flex-col lg:justify-between items-center md:items-start justify-between h-full">
+                <div>
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('cashFlow')}</p>
+                    <p className="text-[10px] text-slate-400">{t('spentToday')}</p>
+                </div>
+                <h2 className="text-3xl font-bold text-slate-900 tracking-tight mt-2">{formatCurrency(cashFlowToday)}</h2>
+                <div className="hidden md:block w-full h-1 bg-slate-100 rounded-full mt-4 overflow-hidden">
+                    <div className="h-full bg-[#007AFF] w-3/4 opacity-20"></div> 
+                    {/* Placeholder progress bar */}
+                </div>
+            </Card>
+        </div>
 
         {/* Search & Filter */}
-        <div className="space-y-3 pt-2">
-          <div className="relative group">
+        <div className="flex flex-col md:flex-row gap-3 pt-2">
+          <div className="relative group flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Search size={18} />
             </div>
@@ -210,7 +226,7 @@ const HomePage: React.FC = () => {
             )}
           </div>
 
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 md:pb-0 md:max-w-2xl">
              <button
                 onClick={() => setFilterType('all')}
                 className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors whitespace-nowrap ${
@@ -242,7 +258,7 @@ const HomePage: React.FC = () => {
                Long-term
              </button>
              
-             <div className="w-[1px] h-6 bg-slate-300 mx-1 self-center" />
+             <div className="w-[1px] h-6 bg-slate-300 mx-1 self-center flex-shrink-0" />
 
              {categories.map(cat => (
                <button
@@ -275,7 +291,7 @@ const HomePage: React.FC = () => {
             )}
           </div>
           
-          <div className="bg-white rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100/50">
             {filteredTransactions.length === 0 ? (
               <div className="p-8 text-center text-slate-400">
                 <p>{t('noActivity')}</p>
@@ -296,8 +312,8 @@ const HomePage: React.FC = () => {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-[16px] text-slate-900 truncate">{displayTitle}</span>
-                          {tx.isWaste && <div className="w-2 h-2 rounded-full bg-red-500" />}
-                          {tx.endDate && <div className="w-2 h-2 rounded-full bg-blue-500" />}
+                          {tx.isWaste && <div className="w-2 h-2 rounded-full bg-red-500" title={t('regret')} />}
+                          {tx.endDate && <div className="w-2 h-2 rounded-full bg-blue-500" title={t('longTerm')} />}
                         </div>
                         <p className="text-[13px] text-slate-500 truncate">
                           {displaySubtitle || new Date(tx.date).toLocaleDateString()}
@@ -307,7 +323,7 @@ const HomePage: React.FC = () => {
                     
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <span className="font-semibold text-[16px] tracking-tight">{formatCurrency(tx.amount)}</span>
-                      <button onClick={(e) => handleDelete(e, tx.id)} className="text-slate-300 hover:text-red-500 p-1 -mr-2">
+                      <button onClick={(e) => handleDelete(e, tx.id)} className="text-slate-300 hover:text-red-500 p-1 -mr-2 transition-colors">
                         <Trash2 size={18} />
                       </button>
                     </div>
@@ -325,7 +341,10 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      <FloatingActionButton onClick={handleAdd} icon={<Plus size={28} strokeWidth={2.5} />} />
+      {/* Mobile Only FAB */}
+      <div className="md:hidden">
+          <FloatingActionButton onClick={handleAdd} icon={<Plus size={28} strokeWidth={2.5} />} />
+      </div>
 
       <AddTransactionModal 
         isOpen={isModalOpen} 

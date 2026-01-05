@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AppSettings, Language, CurrencyCode } from '../types';
 import { getSettings, saveSettings as persistSettings, formatCurrency as formatCurrencyService } from '../services/storageService';
 import { translations } from '../locales';
+import { useAuth } from './AuthContext';
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -13,17 +14,17 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth(); // Refresh settings when user changes
   const [settings, setSettings] = useState<AppSettings>({
     language: 'en',
     currency: 'USD'
   });
 
   useEffect(() => {
-    const loaded = getSettings();
-    if (loaded) {
-      setSettings(loaded);
+    if (user) {
+        getSettings().then(setSettings);
     }
-  }, []);
+  }, [user]);
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     const updated = { ...settings, ...newSettings };

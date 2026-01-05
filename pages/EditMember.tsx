@@ -15,19 +15,24 @@ const EditMember: React.FC = () => {
   
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState(AVATARS[0]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      const member = getMemberById(id);
-      if (member) {
-        setName(member.name);
-        setAvatar(member.avatar);
-      }
+    const fetchData = async () => {
+        if (id) {
+            const member = await getMemberById(id);
+            if (member) {
+              setName(member.name);
+              setAvatar(member.avatar);
+            }
+        }
     }
+    fetchData();
   }, [id]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name) return;
+    setLoading(true);
 
     const member: Member = {
       id: id || Math.random().toString(36).substr(2, 9),
@@ -36,10 +41,11 @@ const EditMember: React.FC = () => {
     };
 
     if (id) {
-      updateMember(member);
+      await updateMember(member);
     } else {
-      addMember(member);
+      await addMember(member);
     }
+    setLoading(false);
     navigate('/settings/members');
   };
 
@@ -91,8 +97,8 @@ const EditMember: React.FC = () => {
         </ListGroup>
 
         <div className="mt-8">
-          <Button onClick={handleSave} disabled={!name}>
-            {t('saveMember')}
+          <Button onClick={handleSave} disabled={!name || loading}>
+            {loading ? 'Saving...' : t('saveMember')}
           </Button>
         </div>
 

@@ -15,22 +15,26 @@ const EditCategory: React.FC = () => {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState(CATEGORY_ICONS[0]);
   const [colorId, setColorId] = useState(CATEGORY_COLORS[0].id);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      const cat = getCategoryById(id);
-      if (cat) {
-        setName(cat.name);
-        setIcon(cat.icon);
-        // Find color id from class string
-        const col = CATEGORY_COLORS.find(c => c.class === cat.color);
-        if (col) setColorId(col.id);
-      }
+    const fetchData = async () => {
+        if (id) {
+            const cat = await getCategoryById(id);
+            if (cat) {
+              setName(cat.name);
+              setIcon(cat.icon);
+              const col = CATEGORY_COLORS.find(c => c.class === cat.color);
+              if (col) setColorId(col.id);
+            }
+          }
     }
+    fetchData();
   }, [id]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name) return;
+    setLoading(true);
 
     const colorObj = CATEGORY_COLORS.find(c => c.id === colorId) || CATEGORY_COLORS[0];
     
@@ -42,10 +46,11 @@ const EditCategory: React.FC = () => {
     };
 
     if (id) {
-      updateCategory(cat);
+      await updateCategory(cat);
     } else {
-      addCategory(cat);
+      await addCategory(cat);
     }
+    setLoading(false);
     navigate('/settings/categories');
   };
 
@@ -111,8 +116,8 @@ const EditCategory: React.FC = () => {
         </ListGroup>
 
         <div className="mt-8">
-          <Button onClick={handleSave} disabled={!name}>
-            {t('saveCategory')}
+          <Button onClick={handleSave} disabled={!name || loading}>
+            {loading ? 'Saving...' : t('saveCategory')}
           </Button>
         </div>
 

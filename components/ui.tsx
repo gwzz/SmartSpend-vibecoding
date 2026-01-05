@@ -2,7 +2,7 @@ import React from 'react';
 
 // iOS Style Grouped Card (White background, usually part of a list)
 export const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`bg-white rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.03)] ${className}`}>
+  <div className={`bg-white rounded-xl shadow-[0_1px_2px_rgba(0,0,0,0.03)] border border-slate-100/50 ${className}`}>
     {children}
   </div>
 );
@@ -23,10 +23,10 @@ export const Badge: React.FC<{ children: React.ReactNode; variant?: 'default' | 
 export const Button: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'danger' }> = ({ className = '', variant = 'primary', ...props }) => {
   const base = "w-full py-3.5 rounded-xl font-semibold text-[17px] transition-opacity active:opacity-60 flex items-center justify-center gap-2";
   const variants = {
-    primary: "bg-[#007AFF] text-white shadow-sm", // iOS Blue
-    secondary: "bg-white text-slate-900 shadow-sm border border-slate-200",
-    ghost: "bg-transparent text-[#007AFF]",
-    danger: "bg-white text-red-500 shadow-sm border border-slate-200"
+    primary: "bg-[#007AFF] text-white shadow-sm hover:bg-[#005ec4]", 
+    secondary: "bg-white text-slate-900 shadow-sm border border-slate-200 hover:bg-slate-50",
+    ghost: "bg-transparent text-[#007AFF] hover:bg-blue-50",
+    danger: "bg-white text-red-500 shadow-sm border border-slate-200 hover:bg-red-50"
   };
   return <button className={`${base} ${variants[variant]} ${className}`} {...props} />;
 };
@@ -44,7 +44,7 @@ export const ListGroup: React.FC<{ children: React.ReactNode; title?: string }> 
 export const ListItem: React.FC<{ children: React.ReactNode; className?: string; onClick?: () => void; isLast?: boolean }> = ({ children, className = '', onClick, isLast }) => (
   <div 
     onClick={onClick}
-    className={`pl-4 bg-white ${onClick ? 'active:bg-slate-50 cursor-pointer' : ''} ${className}`}
+    className={`pl-4 bg-white ${onClick ? 'active:bg-slate-50 cursor-pointer hover:bg-slate-50 transition-colors' : ''} ${className}`}
   >
     <div className={`pr-4 py-3.5 flex items-center justify-between ${!isLast ? 'border-b border-slate-100' : ''}`}>
       {children}
@@ -56,7 +56,7 @@ export const ListItem: React.FC<{ children: React.ReactNode; className?: string;
 export const FloatingActionButton: React.FC<{ onClick: () => void; icon: React.ReactNode }> = ({ onClick, icon }) => (
   <button 
     onClick={onClick}
-    className="fixed bottom-24 right-4 w-14 h-14 bg-[#007AFF] rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center text-white active:scale-95 transition-transform z-50"
+    className="fixed bottom-24 right-4 md:bottom-8 md:right-8 w-14 h-14 bg-[#007AFF] rounded-full shadow-lg shadow-blue-500/30 flex items-center justify-center text-white active:scale-95 transition-all hover:bg-[#005ec4] hover:shadow-xl hover:-translate-y-1 z-50"
   >
     {icon}
   </button>
@@ -67,7 +67,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: R
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
+    <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center p-0 sm:p-6">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
@@ -75,21 +75,21 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: R
       />
       
       {/* Content */}
-      <div className="relative w-full max-w-md bg-[#F2F2F7] sm:rounded-2xl rounded-t-2xl shadow-2xl transform transition-transform duration-300 max-h-[92vh] flex flex-col">
-        {/* Drag Handle (Visual only) */}
+      <div className="relative w-full max-w-md bg-[#F2F2F7] sm:rounded-2xl rounded-t-2xl shadow-2xl transform transition-transform duration-300 max-h-[92vh] flex flex-col sm:max-w-lg sm:max-h-[85vh]">
+        {/* Drag Handle (Visual only, mobile only) */}
         <div className="w-full h-6 flex items-center justify-center pt-2 pb-1 bg-white rounded-t-2xl sm:hidden" onClick={onClose}>
           <div className="w-12 h-1.5 bg-slate-300 rounded-full" />
         </div>
 
         {/* Header */}
-        <div className="bg-white px-4 pb-3 pt-1 flex items-center justify-between border-b border-slate-100 sm:rounded-t-2xl">
-          <button onClick={onClose} className="text-[#007AFF] text-[17px]">Cancel</button>
+        <div className="bg-white px-4 pb-3 pt-3 sm:pt-4 flex items-center justify-between border-b border-slate-100 sm:rounded-t-2xl">
+          <button onClick={onClose} className="text-[#007AFF] text-[17px] hover:text-[#005ec4]">Cancel</button>
           <span className="font-semibold text-[17px]">{title}</span>
           <div className="w-12"></div> {/* Spacer for centering */}
         </div>
 
         {/* Scrollable Body */}
-        <div className="overflow-y-auto p-4 pb-safe flex-1">
+        <div className="overflow-y-auto p-4 pb-safe flex-1 sm:rounded-b-2xl">
           {children}
         </div>
       </div>

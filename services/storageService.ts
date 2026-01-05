@@ -1,332 +1,354 @@
-import { Transaction, Category, Member, AppSettings, CurrencyCode } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_MEMBERS, STORAGE_KEY } from '../constants';
+import { Transaction, Category, Member, AppSettings } from '../types';
+import { INITIAL_CATEGORIES, INITIAL_MEMBERS } from '../constants';
+import { supabase } from './supabase';
 
-interface AppData {
-  transactions: Transaction[];
-  categories: Category[];
-  members: Member[];
-  settings: AppSettings;
-}
-
-const DEFAULT_SETTINGS: AppSettings = {
-  language: 'en',
-  currency: 'USD'
+// Helper to get current user ID
+const getUserId = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id;
 };
 
-// Request persistent storage to prevent browser from clearing data
+// --- Initialization ---
+// For Supabase, we check if default categories/members exist for the user, if not, create them.
 export const initStoragePersistence = async () => {
-  if (navigator.storage && navigator.storage.persist) {
-    const isPersisted = await navigator.storage.persisted();
-    if (!isPersisted) {
-      await navigator.storage.persist();
-    }
+  const userId = await getUserId();
+  if (!userId) return;
+
+  // Check Members
+  const { count: memberCount } = await supabase
+    .from('members')
+    .select('*', { count: 'exact', head: true });
+  
+  if (memberCount === 0) {
+     const initMembers = INITIAL_MEMBERS.map(m => ({
+         id: m.id,
+         user_id: userId,
+         name: m.name,
+         avatar: m.avatar
+     }));
+     await supabase.from('members').insert(initMembers);
+  }
+
+  // Check Categories
+  const { count: catCount } = await supabase
+    .from('categories')
+    .select('*', { count: 'exact', head: true });
+
+  if (catCount === 0) {
+      const initCats = INITIAL_CATEGORIES.map(c => ({
+          id: c.id,
+          user_id: userId,
+          name: c.name,
+          icon: c.icon,
+          color: c.color
+      }));
+      await supabase.from('categories').insert(initCats);
   }
 };
 
-const getStoredData = (): AppData => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    const parsed = JSON.parse(stored);
-    // Migration for existing data without settings
-    if (!parsed.settings) {
-      parsed.settings = DEFAULT_SETTINGS;
-    }
-    return parsed;
+// --- Transactions ---
+
+export const getTransactions = async (): Promise<Transaction[]> => {
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .order('timestamp', { ascending: false }); // Ensure descending order
+
+  if (error) {
+    console.error('Error fetching transactions:', error);
+    return [];
   }
-  const initialData: AppData = {
-    categories: INITIAL_CATEGORIES,
-    members: INITIAL_MEMBERS,
-    transactions: [],
-    settings: DEFAULT_SETTINGS
+
+  return data.map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    amount: parseFloat(t.amount),
+    categoryId: t.category_id,
+    memberIds: t.member_ids, // JSONB array
+    date: t.date,
+    endDate: t.end_date || undefined,
+    isWaste: t.is_waste,
+    note: t.note || '',
+    timestamp: parseInt(t.timestamp)
+  }));
+};
+
+export const getTransactionById = async (id: string): Promise<Transaction | undefined> => {
+  const { data, error } = await supabase.from('transactions').select('*').eq('id', id).single();
+  if (error || !data) return undefined;
+  
+  return {
+    id: data.id,
+    name: data.name,
+    amount: parseFloat(data.amount),
+    categoryId: data.category_id,
+    memberIds: data.member_ids,
+    date: data.date,
+    endDate: data.end_date || undefined,
+    isWaste: data.is_waste,
+    note: data.note || '',
+    timestamp: parseInt(data.timestamp)
   };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initialData));
-  } catch (e) {
-    console.error("Failed to initialize storage", e);
-  }
-  return initialData;
 };
 
-const saveData = (data: AppData) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch (e) {
-    console.error("Storage failed", e);
-    // Simple alert for MVP; in production use a toast or modal
-    alert("Data save failed! Storage might be full. Please export your data immediately.");
-  }
+export const addTransaction = async (tx: Transaction) => {
+  const userId = await getUserId();
+  if (!userId) return;
+
+  // Remove ID from insert payload if we want Supabase to auto-gen UUIDs, 
+  // but keeping it client-side generated is fine too if the table accepts it.
+  // Using client-generated ID from previous logic:
+  
+  const payload = {
+    // id: tx.id, // Optional: let Supabase generate UUID if needed, but keeping consistent
+    user_id: userId,
+    name: tx.name,
+    amount: tx.amount,
+    category_id: tx.categoryId,
+    member_ids: tx.memberIds,
+    date: tx.date,
+    end_date: tx.endDate,
+    is_waste: tx.isWaste,
+    note: tx.note,
+    timestamp: tx.timestamp
+  };
+
+  const { error } = await supabase.from('transactions').insert([payload]);
+  if (error) console.error("Add Tx Error", error);
 };
 
-export const getTransactions = (): Transaction[] => {
-  return getStoredData().transactions.sort((a, b) => b.timestamp - a.timestamp);
+export const updateTransaction = async (tx: Transaction) => {
+  const payload = {
+    name: tx.name,
+    amount: tx.amount,
+    category_id: tx.categoryId,
+    member_ids: tx.memberIds,
+    date: tx.date,
+    end_date: tx.endDate,
+    is_waste: tx.isWaste,
+    note: tx.note,
+    timestamp: tx.timestamp
+  };
+
+  const { error } = await supabase.from('transactions').update(payload).eq('id', tx.id);
+  if (error) console.error("Update Tx Error", error);
 };
 
-export const getTransactionById = (id: string): Transaction | undefined => {
-  return getStoredData().transactions.find(t => t.id === id);
+export const deleteTransaction = async (id: string) => {
+  const { error } = await supabase.from('transactions').delete().eq('id', id);
+  if (error) console.error("Delete Tx Error", error);
 };
 
-export const addTransaction = (tx: Transaction) => {
-  const data = getStoredData();
-  data.transactions.push(tx);
-  saveData(data);
+// --- Categories ---
+
+export const getCategories = async (): Promise<Category[]> => {
+  const { data, error } = await supabase.from('categories').select('*');
+  if (error) return INITIAL_CATEGORIES;
+  return data.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      icon: c.icon,
+      color: c.color
+  }));
 };
 
-export const updateTransaction = (updatedTx: Transaction) => {
-  const data = getStoredData();
-  const index = data.transactions.findIndex(t => t.id === updatedTx.id);
-  if (index !== -1) {
-    data.transactions[index] = updatedTx;
-    saveData(data);
-  }
+export const getCategoryById = async (id: string): Promise<Category | undefined> => {
+   const { data } = await supabase.from('categories').select('*').eq('id', id).single();
+   if (!data) return undefined;
+   return { id: data.id, name: data.name, icon: data.icon, color: data.color };
 };
 
-export const deleteTransaction = (id: string) => {
-  const data = getStoredData();
-  data.transactions = data.transactions.filter(t => t.id !== id);
-  saveData(data);
+export const addCategory = async (cat: Category) => {
+  const userId = await getUserId();
+  await supabase.from('categories').insert([{
+      id: cat.id,
+      user_id: userId,
+      name: cat.name,
+      icon: cat.icon,
+      color: cat.color
+  }]);
 };
 
-export const getCategories = (): Category[] => getStoredData().categories;
-
-export const getCategoryById = (id: string): Category | undefined => {
-  return getStoredData().categories.find(c => c.id === id);
+export const updateCategory = async (cat: Category) => {
+    await supabase.from('categories').update({
+        name: cat.name,
+        icon: cat.icon,
+        color: cat.color
+    }).eq('id', cat.id);
 };
 
-export const addCategory = (cat: Category) => {
-  const data = getStoredData();
-  data.categories.push(cat);
-  saveData(data);
+export const deleteCategory = async (id: string) => {
+    await supabase.from('categories').delete().eq('id', id);
 };
 
-export const updateCategory = (updatedCat: Category) => {
-  const data = getStoredData();
-  const index = data.categories.findIndex(c => c.id === updatedCat.id);
-  if (index !== -1) {
-    data.categories[index] = updatedCat;
-    saveData(data);
-  }
+// --- Members ---
+
+export const getMembers = async (): Promise<Member[]> => {
+    const { data, error } = await supabase.from('members').select('*');
+    if (error) return INITIAL_MEMBERS;
+    return data.map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        avatar: m.avatar
+    }));
 };
 
-export const deleteCategory = (id: string) => {
-  const data = getStoredData();
-  data.categories = data.categories.filter(c => c.id !== id);
-  saveData(data);
+export const getMemberById = async (id: string): Promise<Member | undefined> => {
+    const { data } = await supabase.from('members').select('*').eq('id', id).single();
+    if (!data) return undefined;
+    return { id: data.id, name: data.name, avatar: data.avatar };
 };
 
-// --- Member Management ---
-
-export const getMembers = (): Member[] => getStoredData().members;
-
-export const getMemberById = (id: string): Member | undefined => {
-  return getStoredData().members.find(m => m.id === id);
+export const addMember = async (member: Member) => {
+    const userId = await getUserId();
+    await supabase.from('members').insert([{
+        id: member.id,
+        user_id: userId,
+        name: member.name,
+        avatar: member.avatar
+    }]);
 };
 
-export const addMember = (member: Member) => {
-  const data = getStoredData();
-  data.members.push(member);
-  saveData(data);
+export const updateMember = async (member: Member) => {
+    await supabase.from('members').update({
+        name: member.name,
+        avatar: member.avatar
+    }).eq('id', member.id);
 };
 
-export const updateMember = (updatedMember: Member) => {
-  const data = getStoredData();
-  const index = data.members.findIndex(m => m.id === updatedMember.id);
-  if (index !== -1) {
-    data.members[index] = updatedMember;
-    saveData(data);
-  }
-};
-
-export const deleteMember = (id: string) => {
-  const data = getStoredData();
-  data.members = data.members.filter(m => m.id !== id);
-  saveData(data);
+export const deleteMember = async (id: string) => {
+    await supabase.from('members').delete().eq('id', id);
 };
 
 // --- Settings ---
 
-export const getSettings = (): AppSettings => {
-  return getStoredData().settings;
+const DEFAULT_SETTINGS: AppSettings = { language: 'en', currency: 'USD' };
+
+export const getSettings = async (): Promise<AppSettings> => {
+    const { data } = await supabase.from('user_settings').select('*').single();
+    if (data) {
+        return { language: data.language as any, currency: data.currency as any };
+    }
+    return DEFAULT_SETTINGS;
 };
 
-export const saveSettings = (settings: AppSettings) => {
-  const data = getStoredData();
-  data.settings = settings;
-  saveData(data);
+export const saveSettings = async (settings: AppSettings) => {
+    const userId = await getUserId();
+    if (!userId) return;
+
+    // Upsert settings
+    await supabase.from('user_settings').upsert({
+        user_id: userId,
+        language: settings.language,
+        currency: settings.currency
+    });
 };
 
-// --- Import / Export / Backup Logic ---
+// --- Utils (Export/Import/Calc) ---
+// Note: Export/Import JSON logic is complicated with Database.
+// For now, export fetches all data dynamically.
 
-// Helper function to create a download
-const triggerDownload = (content: string, fileName: string, contentType: string) => {
-  const blob = new Blob([content], { type: contentType });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', fileName);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
+export const exportTransactionsToCSV = async () => {
+    const transactions = await getTransactions();
+    const categories = await getCategories();
+    const members = await getMembers();
+    const settings = await getSettings();
 
-export const exportTransactionsToCSV = () => {
-  const data = getStoredData();
-  const { transactions, categories, members, settings } = data;
-
-  // Header row
-  const headers = ['Date', 'Item Name', 'Amount', 'Category', 'Split With', 'Type', 'Is Waste', 'Note', 'End Date (Amortization)'];
+    // Header row
+    const headers = ['Date', 'Item Name', 'Amount', 'Category', 'Split With', 'Type', 'Is Waste', 'Note', 'End Date (Amortization)'];
+    
+    const rows = transactions.map(tx => {
+      const catName = categories.find(c => c.id === tx.categoryId)?.name || 'Unknown';
+      const memberNames = tx.memberIds.map(mid => members.find(m => m.id === mid)?.name || mid).join(', ');
+      const type = tx.endDate ? 'Long-term' : 'Instant';
+      const clean = (str: string) => `"${(str || '').replace(/"/g, '""')}"`;
   
-  const rows = transactions.map(tx => {
-    const catName = categories.find(c => c.id === tx.categoryId)?.name || 'Unknown';
-    const memberNames = tx.memberIds.map(mid => members.find(m => m.id === mid)?.name || mid).join(', ');
-    const type = tx.endDate ? 'Long-term' : 'Instant';
-    
-    // Escape quotes and commas for CSV format
-    const clean = (str: string) => `"${(str || '').replace(/"/g, '""')}"`;
-
-    return [
-      tx.date,
-      clean(tx.name),
-      tx.amount.toFixed(2) + ' ' + settings.currency,
-      clean(catName),
-      clean(memberNames),
-      type,
-      tx.isWaste ? 'Yes' : 'No',
-      clean(tx.note),
-      tx.endDate || ''
-    ].join(',');
-  });
-
-  const csvContent = [headers.join(','), ...rows].join('\n');
-  triggerDownload(csvContent, `smartspend_export_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8;');
-};
-
-/**
- * Exports the Full App State as a JSON file.
- * Includes a version number to help future imports.
- */
-export const exportBackupJSON = () => {
-  const data = getStoredData();
-  const backupObject = {
-    version: 1, // Schema version
-    timestamp: Date.now(),
-    app: "SmartSpend",
-    data: data
-  };
+      return [
+        tx.date,
+        clean(tx.name),
+        tx.amount.toFixed(2) + ' ' + settings.currency,
+        clean(catName),
+        clean(memberNames),
+        type,
+        tx.isWaste ? 'Yes' : 'No',
+        clean(tx.note),
+        tx.endDate || ''
+      ].join(',');
+    });
   
-  const jsonContent = JSON.stringify(backupObject, null, 2);
-  triggerDownload(jsonContent, `smartspend_backup_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `smartspend_export_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
 };
 
-/**
- * Imports data from a JSON string.
- * This acts as an ADAPTER for older versions.
- * @param jsonString The raw file content
- * @returns boolean indicating success or failure
- */
-export const importBackupJSON = (jsonString: string): boolean => {
-  try {
-    const parsed = JSON.parse(jsonString);
-    
-    // Determine the structure of the import
-    // Structure A: Exported via exportBackupJSON (has 'data' wrapper)
-    // Structure B: Raw localStorage dump (root is the data)
-    let rawData: Partial<AppData> = parsed.data || parsed;
-
-    // --- Sanitization / Migration Logic ---
-    // Ensure all required fields exist, even if importing from an older version
-    
-    const sanitizedData: AppData = {
-      // 1. Transactions
-      transactions: Array.isArray(rawData.transactions) 
-        ? rawData.transactions.map((t: any) => ({
-            id: t.id || Math.random().toString(36).substr(2, 9),
-            name: t.name || 'Unknown',
-            amount: Number(t.amount) || 0,
-            categoryId: t.categoryId || 'c8', // Default to Other
-            memberIds: Array.isArray(t.memberIds) ? t.memberIds : [],
-            date: t.date || new Date().toISOString().split('T')[0],
-            // Compatibility: 'endDate' might be missing in very old versions
-            endDate: t.endDate || undefined,
-            // Compatibility: 'isWaste' might be missing
-            isWaste: typeof t.isWaste === 'boolean' ? t.isWaste : false,
-            note: t.note || '',
-            timestamp: t.timestamp || Date.now()
-          }))
-        : [],
-
-      // 2. Categories
-      categories: Array.isArray(rawData.categories) && rawData.categories.length > 0
-        ? rawData.categories
-        : INITIAL_CATEGORIES,
-
-      // 3. Members
-      members: Array.isArray(rawData.members) && rawData.members.length > 0
-        ? rawData.members
-        : INITIAL_MEMBERS,
-
-      // 4. Settings
-      settings: rawData.settings ? {
-        language: rawData.settings.language === 'zh' ? 'zh' : 'en',
-        currency: rawData.settings.currency || 'USD'
-      } : DEFAULT_SETTINGS
+export const exportBackupJSON = async () => {
+    const data = {
+        transactions: await getTransactions(),
+        categories: await getCategories(),
+        members: await getMembers(),
+        settings: await getSettings()
     };
-
-    saveData(sanitizedData);
-    return true;
-  } catch (e) {
-    console.error("Import Failed", e);
-    return false;
-  }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `smartspend_backup.json`;
+    link.click();
 };
 
-// --- Amortization Logic ---
+// Simplified logic for calculating daily cost without fetching everything locally
+export const getDailyCostForDate = (dateStr: string, transactions: Transaction[]): number => {
+    const targetDate = new Date(dateStr);
+    targetDate.setHours(0,0,0,0);
+    const targetTime = targetDate.getTime();
+  
+    let total = 0;
+  
+    transactions.forEach(tx => {
+      const start = new Date(tx.date);
+      start.setHours(0,0,0,0);
+      const startTime = start.getTime();
+  
+      if (tx.endDate) {
+        const end = new Date(tx.endDate);
+        end.setHours(0,0,0,0);
+        const endTime = end.getTime();
+        if (targetTime >= startTime && targetTime <= endTime) {
+          const days = getDaysDiff(tx.date, tx.endDate);
+          total += tx.amount / days;
+        }
+      } else {
+        if (startTime === targetTime) {
+          total += tx.amount;
+        }
+      }
+    });
+  
+    return total;
+};
 
 export const getDaysDiff = (start: string, end: string): number => {
-  const d1 = new Date(start);
-  const d2 = new Date(end);
-  d1.setHours(0,0,0,0);
-  d2.setHours(0,0,0,0);
-  const diffTime = Math.abs(d2.getTime() - d1.getTime());
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-};
-
-export const getDailyCostForDate = (dateStr: string, transactions: Transaction[]): number => {
-  const targetDate = new Date(dateStr);
-  targetDate.setHours(0,0,0,0);
-  const targetTime = targetDate.getTime();
-
-  let total = 0;
-
-  transactions.forEach(tx => {
-    const start = new Date(tx.date);
-    start.setHours(0,0,0,0);
-    const startTime = start.getTime();
-
-    if (tx.endDate) {
-      const end = new Date(tx.endDate);
-      end.setHours(0,0,0,0);
-      const endTime = end.getTime();
-      if (targetTime >= startTime && targetTime <= endTime) {
-        const days = getDaysDiff(tx.date, tx.endDate);
-        total += tx.amount / days;
-      }
-    } else {
-      if (startTime === targetTime) {
-        total += tx.amount;
-      }
-    }
-  });
-
-  return total;
+    const d1 = new Date(start);
+    const d2 = new Date(end);
+    d1.setHours(0,0,0,0);
+    d2.setHours(0,0,0,0);
+    const diffTime = Math.abs(d2.getTime() - d1.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 };
 
 export const formatCurrency = (amount: number, currencyCode: string = 'USD') => {
-  // Use a simple formatter. For a robust app, use Intl.NumberFormat with dynamically loaded locales.
-  // Here we assume 'en-US' locale for formatting numbers, but use the correct currency style.
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(amount);
-  } catch (e) {
-    return `${currencyCode} ${amount.toFixed(2)}`;
-  }
+    try {
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(amount);
+    } catch (e) {
+      return `${currencyCode} ${amount.toFixed(2)}`;
+    }
+};
+
+// Stub for import (harder to do with async db without robust logic)
+export const importBackupJSON = async (jsonString: string): Promise<boolean> => {
+    alert("Import not fully supported in Cloud mode yet.");
+    return false;
 };
