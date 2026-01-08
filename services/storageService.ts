@@ -18,7 +18,8 @@ export const initStoragePersistence = async () => {
     // 1. Check & Seed Members
     const { count: memberCount, error: memberError } = await supabase
       .from('members')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
     
     if (!memberError && (memberCount === null || memberCount === 0)) {
        console.log("Seeding default members...");
@@ -35,7 +36,8 @@ export const initStoragePersistence = async () => {
     // 2. Check & Seed Categories
     const { count: catCount, error: catError } = await supabase
       .from('categories')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
 
     if (!catError && (catCount === null || catCount === 0)) {
         console.log("Seeding default categories...");
@@ -63,6 +65,7 @@ export const getTransactions = async (): Promise<Transaction[]> => {
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
+    .eq('user_id', userId)
     .order('timestamp', { ascending: false });
 
   if (error) {
@@ -87,7 +90,15 @@ export const getTransactions = async (): Promise<Transaction[]> => {
 };
 
 export const getTransactionById = async (id: string): Promise<Transaction | undefined> => {
-  const { data, error } = await supabase.from('transactions').select('*').eq('id', id).single();
+  const userId = await getUserId();
+  if (!userId) return undefined;
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single();
   if (error || !data) {
     if (error) console.error("Error fetching transaction by ID:", error.message);
     return undefined;
@@ -130,6 +141,9 @@ export const addTransaction = async (tx: Transaction) => {
 };
 
 export const updateTransaction = async (tx: Transaction) => {
+  const userId = await getUserId();
+  if (!userId) return;
+
   const payload = {
     name: tx.name,
     amount: tx.amount,
@@ -142,19 +156,36 @@ export const updateTransaction = async (tx: Transaction) => {
     timestamp: tx.timestamp
   };
 
-  const { error } = await supabase.from('transactions').update(payload).eq('id', tx.id);
+  const { error } = await supabase
+    .from('transactions')
+    .update(payload)
+    .eq('id', tx.id)
+    .eq('user_id', userId);
   if (error) console.error("Update Tx Error:", error.message);
 };
 
 export const deleteTransaction = async (id: string) => {
-  const { error } = await supabase.from('transactions').delete().eq('id', id);
+  const userId = await getUserId();
+  if (!userId) return;
+
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
   if (error) console.error("Delete Tx Error:", error.message);
 };
 
 // --- Categories ---
 
 export const getCategories = async (): Promise<Category[]> => {
-  const { data, error } = await supabase.from('categories').select('*');
+  const userId = await getUserId();
+  if (!userId) return INITIAL_CATEGORIES;
+
+  const { data, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('user_id', userId);
   if (error) {
     console.warn("Fetch Categories Error (using defaults):", error.message);
     return INITIAL_CATEGORIES;
@@ -170,38 +201,60 @@ export const getCategories = async (): Promise<Category[]> => {
 };
 
 export const getCategoryById = async (id: string): Promise<Category | undefined> => {
-   const { data } = await supabase.from('categories').select('*').eq('id', id).single();
+  const userId = await getUserId();
+  if (!userId) return undefined;
+
+  const { data } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single();
    if (!data) return undefined;
    return { id: data.id, name: data.name, icon: data.icon, color: data.color };
 };
 
 export const addCategory = async (cat: Category) => {
   const userId = await getUserId();
+  if (!userId) return;
+
   await supabase.from('categories').insert([{
-      id: cat.id,
-      user_id: userId,
-      name: cat.name,
-      icon: cat.icon,
-      color: cat.color
+    id: cat.id,
+    user_id: userId,
+    name: cat.name,
+    icon: cat.icon,
+    color: cat.color
   }]);
 };
 
 export const updateCategory = async (cat: Category) => {
-    await supabase.from('categories').update({
-        name: cat.name,
-        icon: cat.icon,
-        color: cat.color
-    }).eq('id', cat.id);
+  const userId = await getUserId();
+  if (!userId) return;
+
+  await supabase.from('categories').update({
+    name: cat.name,
+    icon: cat.icon,
+    color: cat.color
+  }).eq('id', cat.id).eq('user_id', userId);
 };
 
 export const deleteCategory = async (id: string) => {
-    await supabase.from('categories').delete().eq('id', id);
+  const userId = await getUserId();
+  if (!userId) return;
+
+  await supabase.from('categories').delete().eq('id', id).eq('user_id', userId);
 };
 
 // --- Members ---
 
 export const getMembers = async (): Promise<Member[]> => {
-    const { data, error } = await supabase.from('members').select('*');
+    const userId = await getUserId();
+    if (!userId) return INITIAL_MEMBERS;
+
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .eq('user_id', userId);
     if (error) {
       console.warn("Fetch Members Error (using defaults):", error.message);
       return INITIAL_MEMBERS;
@@ -216,13 +269,23 @@ export const getMembers = async (): Promise<Member[]> => {
 };
 
 export const getMemberById = async (id: string): Promise<Member | undefined> => {
-    const { data } = await supabase.from('members').select('*').eq('id', id).single();
+    const userId = await getUserId();
+    if (!userId) return undefined;
+
+    const { data } = await supabase
+      .from('members')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single();
     if (!data) return undefined;
     return { id: data.id, name: data.name, avatar: data.avatar };
 };
 
 export const addMember = async (member: Member) => {
     const userId = await getUserId();
+  if (!userId) return;
+
     await supabase.from('members').insert([{
         id: member.id,
         user_id: userId,
@@ -232,14 +295,20 @@ export const addMember = async (member: Member) => {
 };
 
 export const updateMember = async (member: Member) => {
-    await supabase.from('members').update({
-        name: member.name,
-        avatar: member.avatar
-    }).eq('id', member.id);
+  const userId = await getUserId();
+  if (!userId) return;
+
+  await supabase.from('members').update({
+    name: member.name,
+    avatar: member.avatar
+  }).eq('id', member.id).eq('user_id', userId);
 };
 
 export const deleteMember = async (id: string) => {
-    await supabase.from('members').delete().eq('id', id);
+  const userId = await getUserId();
+  if (!userId) return;
+
+  await supabase.from('members').delete().eq('id', id).eq('user_id', userId);
 };
 
 // --- Settings ---
@@ -250,7 +319,11 @@ export const getSettings = async (): Promise<AppSettings> => {
     const userId = await getUserId();
     if (!userId) return DEFAULT_SETTINGS;
 
-    const { data, error } = await supabase.from('user_settings').select('*').eq('user_id', userId).single();
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
     
     if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
         console.warn("Error fetching settings:", error.message);

@@ -11,7 +11,7 @@ const COLORS = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D55'
 type ViewMode = 'overview' | 'member' | 'category';
 
 const StatsPage: React.FC = () => {
-  const { t, formatCurrency } = useSettings();
+    const { t, formatCurrency, settings } = useSettings();
   
   // Data State
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
@@ -41,8 +41,8 @@ const StatsPage: React.FC = () => {
     fetchData();
   }, []);
 
-  // Calculation Effect
-  useEffect(() => {
+    // Calculation Effect
+    useEffect(() => {
     const calc = async () => {
         const txs = await getTransactions();
         
@@ -142,7 +142,7 @@ const StatsPage: React.FC = () => {
     };
     calc();
 
-  }, [viewMode, selectedFilterId, t]);
+    }, [viewMode, selectedFilterId, settings.language]);
 
   const handleTabChange = (mode: ViewMode) => {
     setViewMode(mode);
