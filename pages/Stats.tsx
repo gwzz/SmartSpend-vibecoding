@@ -255,8 +255,8 @@ const StatsPage: React.FC = () => {
                     {viewMode === 'category' ? t('spendingByMember') : t('spendingByCategory')}
                 </h3>
                 
-                <Card className="p-4 h-full">
-                <div className="h-64 relative">
+                <Card className="p-4 h-[22rem] md:h-[24rem] flex flex-col overflow-hidden">
+                <div className="flex-1 relative">
                     <ResponsiveContainer width="100%" height="100%">
                     {viewMode === 'category' ? (
                         <BarChart data={primaryChartData} layout="vertical" margin={{ left: 10, right: 10 }}>
@@ -302,7 +302,7 @@ const StatsPage: React.FC = () => {
                 
                 {/* Legend for Pie Chart */}
                 {viewMode !== 'category' && (
-                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 mt-6">
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4 mt-4 overflow-y-auto max-h-28 pr-1">
                     {primaryChartData.slice(0, 6).map((entry, index) => (
                         <div key={index} className="flex items-center gap-2 text-[13px]">
                         <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
@@ -319,7 +319,8 @@ const StatsPage: React.FC = () => {
             {viewMode === 'overview' && (
                 <div className="md:col-span-1 lg:col-span-1">
                     <h3 className="text-[13px] uppercase text-slate-500 font-normal px-4 mb-2 ml-1">{t('spendingByMember')}</h3>
-                    <Card className="h-[21rem] md:h-full p-4">
+                    <Card className="p-4 h-[22rem] md:h-[24rem] flex flex-col overflow-hidden">
+                        <div className="flex-1">
                         <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={secondaryChartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                             <XAxis type="number" hide />
@@ -332,6 +333,7 @@ const StatsPage: React.FC = () => {
                             <Bar dataKey="value" fill="#007AFF" radius={[0, 4, 4, 0]} barSize={24} />
                         </BarChart>
                         </ResponsiveContainer>
+                        </div>
                     </Card>
                 </div>
             )}
