@@ -1,14 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
-import { getTransactions, getCategories, getMembers } from '../services/storageService';
-import { Card, ListGroup } from '../components/ui';
-import { AlertTriangle, BarChart3 } from 'lucide-react';
+import { getTransactions, getCategories, getMembers, getReflectionTags } from '../services/storageService';
+import { Card } from '../components/ui';
+import { BarChart3 } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
-import { Category, Member } from '../types';
+import { Category, Member, ReflectionTag, Transaction } from '../types';
+import { normalizeReflectionTagIds } from '../utils/reflection';
 
 const COLORS = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D55', '#5856D6', '#8E8E93'];
 
 type ViewMode = 'overview' | 'member' | 'category';
+
+const parseColorClasses = (color: string) => {
+    const tokens = color?.split(' ') ?? [];
+    const bg = tokens.find(token => token.startsWith('bg-')) || 'bg-slate-100';
+    const text = tokens.find(token => token.startsWith('text-')) || 'text-slate-800';
+    return { bg, text };
+};
 
 const StatsPage: React.FC = () => {
     const { t, formatCurrency, settings } = useSettings();
@@ -21,11 +29,12 @@ const StatsPage: React.FC = () => {
   // Lists
   const [categories, setCategories] = useState<Category[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+    const [reflectionTags, setReflectionTags] = useState<ReflectionTag[]>([]);
 
   // Chart Data
-  const [primaryChartData, setPrimaryChartData] = useState<any[]>([]); // For Pie or Bar
-  const [secondaryChartData, setSecondaryChartData] = useState<any[]>([]); // For Bar
-  const [wasteTotal, setWasteTotal] = useState(0);
+    const [primaryChartData, setPrimaryChartData] = useState<any[]>([]); // For Pie or Bar
+    const [secondaryChartData, setSecondaryChartData] = useState<any[]>([]); // For Bar
+    const [reflectionTotals, setReflectionTotals] = useState<Record<string, number>>({});
   const [totalSpend, setTotalSpend] = useState(0);
   const [displayTitle, setDisplayTitle] = useState('');
 
@@ -34,8 +43,10 @@ const StatsPage: React.FC = () => {
     const fetchData = async () => {
         const cats = await getCategories();
         const mems = await getMembers();
+                const tags = await getReflectionTags();
         setCategories(cats);
         setMembers(mems);
+                setReflectionTags(tags);
         if (mems.length > 0) setSelectedFilterId(mems[0].id);
     };
     fetchData();
@@ -49,30 +60,41 @@ const StatsPage: React.FC = () => {
         if (!txs || txs.length === 0) {
             setIsEmpty(true);
             setTotalSpend(0);
-            setWasteTotal(0);
             setPrimaryChartData([]);
             setSecondaryChartData([]);
+            setReflectionTotals({});
             return;
         }
         setIsEmpty(false);
 
         const allCategories = await getCategories();
         const allMembers = await getMembers();
+        const tagTotals: Record<string, number> = {};
         
         let calculatedTotal = 0;
-        let calculatedWaste = 0;
-        
+
         // Maps for aggregation
         let catMap: Record<string, number> = {};
         let memMap: Record<string, number> = {};
+
+        const addReflectionValue = (tx: Transaction, value: number) => {
+            const ids = normalizeReflectionTagIds(tx, reflectionTags);
+            ids.forEach(id => {
+                tagTotals[id] = (tagTotals[id] || 0) + value;
+            });
+        };
+
+        const accumulateForTransaction = (tx: Transaction, value: number) => {
+            calculatedTotal += value;
+            addReflectionValue(tx, value);
+        };
 
         // Logic Switch based on View Mode
         if (viewMode === 'overview') {
         setDisplayTitle(t('total'));
         
         txs.forEach(tx => {
-            calculatedTotal += tx.amount;
-            if (tx.isWaste) calculatedWaste += tx.amount;
+            accumulateForTransaction(tx, tx.amount);
 
             const catName = allCategories.find(c => c.id === tx.categoryId)?.name || 'Unknown';
             catMap[catName] = (catMap[catName] || 0) + tx.amount;
@@ -95,8 +117,7 @@ const StatsPage: React.FC = () => {
             if (tx.memberIds.includes(selectedFilterId)) {
             const splitAmount = tx.amount / tx.memberIds.length;
             
-            calculatedTotal += splitAmount;
-            if (tx.isWaste) calculatedWaste += splitAmount;
+            accumulateForTransaction(tx, splitAmount);
 
             const catName = allCategories.find(c => c.id === tx.categoryId)?.name || 'Unknown';
             catMap[catName] = (catMap[catName] || 0) + splitAmount;
@@ -111,8 +132,7 @@ const StatsPage: React.FC = () => {
 
         txs.forEach(tx => {
             if (tx.categoryId === selectedFilterId) {
-            calculatedTotal += tx.amount;
-            if (tx.isWaste) calculatedWaste += tx.amount;
+            accumulateForTransaction(tx, tx.amount);
             
             const splitAmount = tx.amount / tx.memberIds.length;
             tx.memberIds.forEach(mId => {
@@ -124,7 +144,7 @@ const StatsPage: React.FC = () => {
         }
 
         setTotalSpend(calculatedTotal);
-        setWasteTotal(calculatedWaste);
+        setReflectionTotals(tagTotals);
 
         // Format Data for Recharts
         const catData = Object.entries(catMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value);
@@ -142,7 +162,7 @@ const StatsPage: React.FC = () => {
     };
     calc();
 
-    }, [viewMode, selectedFilterId, settings.language]);
+    }, [viewMode, selectedFilterId, settings.language, reflectionTags]);
 
   const handleTabChange = (mode: ViewMode) => {
     setViewMode(mode);
@@ -227,26 +247,35 @@ const StatsPage: React.FC = () => {
             </div>
         )}
 
-        {/* Regret Monitor - Always visible */}
-        <div className="mb-6 max-w-xl">
-            <ListGroup>
-                <div className="p-4 bg-white relative overflow-hidden">
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="p-1.5 bg-red-100 rounded-md text-red-600">
-                    <AlertTriangle size={18} />
-                    </div>
-                    <span className="text-[15px] font-semibold text-red-600 uppercase tracking-wide">{t('regretMonitor')}</span>
-                </div>
-                <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-slate-900">{formatCurrency(wasteTotal)}</span>
-                    {totalSpend > 0 && (
-                        <span className="text-sm text-slate-400">({Math.round((wasteTotal / totalSpend) * 100)}%)</span>
-                    )}
-                    <span className="text-slate-500 ml-1">{t('wasted')}</span>
-                </div>
-                </div>
-            </ListGroup>
-        </div>
+        {/* Reflection Monitors */}
+        {reflectionTags.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+                {reflectionTags.map(tag => {
+                    const value = reflectionTotals[tag.id] || 0;
+                    const percent = totalSpend > 0 ? Math.round((value / totalSpend) * 100) : 0;
+                    const { bg, text } = parseColorClasses(tag.color);
+                    return (
+                        <Card key={tag.id} className="p-4 relative overflow-hidden">
+                            <div className="flex items-center gap-2 mb-1">
+                                <div className={`p-1.5 rounded-md ${bg} ${text}`}>
+                                    <span className="text-sm">{tag.icon || '🏷️'}</span>
+                                </div>
+                                <span className="text-[15px] font-semibold uppercase tracking-wide text-slate-600">
+                                    {tag.name}
+                                </span>
+                            </div>
+                            <div className="mt-2 flex items-baseline gap-2">
+                                <span className="text-3xl font-bold text-slate-900">{formatCurrency(value)}</span>
+                                {totalSpend > 0 && (
+                                    <span className="text-sm text-slate-400">({percent}%)</span>
+                                )}
+                                <span className="text-slate-500 ml-1">{t('total')}</span>
+                            </div>
+                        </Card>
+                    );
+                })}
+            </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {/* Primary Chart Area */}

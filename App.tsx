@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { House, ChartPie, Settings as SettingsIcon } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import HomePage from './pages/Home';
@@ -13,6 +14,8 @@ import MemberList from './pages/MemberList';
 import EditMember from './pages/EditMember';
 import LanguageSettings from './pages/LanguageSettings';
 import CurrencySettings from './pages/CurrencySettings';
+import ReflectionTagList from './pages/ReflectionTagList';
+import EditReflectionTag from './pages/EditReflectionTag';
 import { initStoragePersistence } from './services/storageService';
 
 const NavItem = ({ to, icon: Icon, labelKey }: { to: string; icon: any; labelKey: string }) => {
@@ -57,7 +60,8 @@ const Layout: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F2F2F7] text-slate-900 font-sans flex flex-col md:flex-row pb-safe">
+    <>
+      <div className="min-h-screen bg-[#F2F2F7] text-slate-900 font-sans flex flex-col md:flex-row pb-safe">
       
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-200 h-screen sticky top-0 z-50">
@@ -89,6 +93,9 @@ const Layout: React.FC = () => {
             <Route path="/settings/members" element={<MemberList />} />
             <Route path="/settings/members/add" element={<EditMember />} />
             <Route path="/settings/members/edit/:id" element={<EditMember />} />
+            <Route path="/settings/reflection-tags" element={<ReflectionTagList />} />
+            <Route path="/settings/reflection-tags/add" element={<EditReflectionTag />} />
+            <Route path="/settings/reflection-tags/edit/:id" element={<EditReflectionTag />} />
             <Route path="/settings/language" element={<LanguageSettings />} />
             <Route path="/settings/currency" element={<CurrencySettings />} />
           </Routes>
@@ -103,7 +110,9 @@ const Layout: React.FC = () => {
           </nav>
         )}
       </main>
-    </div>
+      </div>
+      <Analytics />
+    </>
   );
 };
 

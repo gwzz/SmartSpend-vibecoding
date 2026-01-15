@@ -1,6 +1,7 @@
-import { Transaction, Category, Member, AppSettings } from '../types';
-import { INITIAL_CATEGORIES, INITIAL_MEMBERS } from '../constants';
+import { Transaction, Category, Member, AppSettings, ReflectionTag } from '../types';
+import { DEFAULT_REFLECTION_TAGS, INITIAL_CATEGORIES, INITIAL_MEMBERS } from '../constants';
 import { supabase } from './supabase';
+import { createReflectionFlags, normalizeReflectionTagIds } from '../utils/reflection';
 
 // Helper to get current user ID
 const getUserId = async () => {
@@ -51,12 +52,63 @@ export const initStoragePersistence = async () => {
         const { error: insertError } = await supabase.from('categories').insert(initCats);
         if (insertError) console.error("Error seeding categories:", insertError.message);
     }
+
+    // 3. Check & Seed Reflection Tags
+    const { count: tagCount, error: tagError } = await supabase
+      .from('reflection_tags')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (!tagError && (tagCount === null || tagCount === 0)) {
+        console.log("Seeding default reflection tags...");
+        const initTags = DEFAULT_REFLECTION_TAGS.map(t => ({
+            id: t.id,
+            user_id: userId,
+            name: t.name,
+            color: t.color,
+            icon: t.icon || null
+        }));
+        const { error: insertError } = await supabase.from('reflection_tags').insert(initTags);
+        if (insertError) console.error("Error seeding reflection tags:", insertError.message);
+    }
   } catch (err) {
     console.error("Initialization Error:", err);
   }
 };
 
 // --- Transactions ---
+
+const mapDbTransaction = (t: any): Transaction => {
+  const reflection = createReflectionFlags(t.reflection_flags, t.is_waste);
+  const reflectionTagIds = Array.isArray(t.reflection_tag_ids) ? t.reflection_tag_ids : [];
+  const normalizedTags = reflectionTagIds.length > 0
+    ? reflectionTagIds
+    : normalizeReflectionTagIds({
+        ...t,
+        reflection,
+        isWaste: t.is_waste,
+        reflectionTagIds,
+        memberIds: t.member_ids,
+        categoryId: t.category_id,
+        note: t.note || '',
+        timestamp: typeof t.timestamp === 'string' ? parseInt(t.timestamp) : t.timestamp,
+      } as Transaction, DEFAULT_REFLECTION_TAGS);
+
+  return {
+    id: t.id,
+    name: t.name,
+    amount: parseFloat(t.amount),
+    categoryId: t.category_id,
+    memberIds: t.member_ids,
+    date: t.date,
+    endDate: t.end_date || undefined,
+    isWaste: reflection.regret,
+    reflection,
+    reflectionTagIds: normalizedTags,
+    note: t.note || '',
+    timestamp: typeof t.timestamp === 'string' ? parseInt(t.timestamp) : t.timestamp
+  };
+};
 
 export const getTransactions = async (): Promise<Transaction[]> => {
   const userId = await getUserId();
@@ -75,18 +127,7 @@ export const getTransactions = async (): Promise<Transaction[]> => {
 
   if (!data) return [];
 
-  return data.map((t: any) => ({
-    id: t.id,
-    name: t.name,
-    amount: parseFloat(t.amount),
-    categoryId: t.category_id,
-    memberIds: t.member_ids, // JSONB array
-    date: t.date,
-    endDate: t.end_date || undefined,
-    isWaste: t.is_waste,
-    note: t.note || '',
-    timestamp: typeof t.timestamp === 'string' ? parseInt(t.timestamp) : t.timestamp
-  }));
+  return data.map(mapDbTransaction);
 };
 
 export const getTransactionById = async (id: string): Promise<Transaction | undefined> => {
@@ -104,23 +145,15 @@ export const getTransactionById = async (id: string): Promise<Transaction | unde
     return undefined;
   }
   
-  return {
-    id: data.id,
-    name: data.name,
-    amount: parseFloat(data.amount),
-    categoryId: data.category_id,
-    memberIds: data.member_ids,
-    date: data.date,
-    endDate: data.end_date || undefined,
-    isWaste: data.is_waste,
-    note: data.note || '',
-    timestamp: typeof data.timestamp === 'string' ? parseInt(data.timestamp) : data.timestamp
-  };
+  return mapDbTransaction(data);
 };
 
 export const addTransaction = async (tx: Transaction) => {
   const userId = await getUserId();
   if (!userId) return;
+
+  const reflection = createReflectionFlags(tx.reflection, tx.isWaste);
+  const reflectionTagIds = normalizeReflectionTagIds(tx, DEFAULT_REFLECTION_TAGS, DEFAULT_REFLECTION_TAGS[0]?.id);
 
   const payload = {
     id: tx.id,
@@ -131,7 +164,9 @@ export const addTransaction = async (tx: Transaction) => {
     member_ids: tx.memberIds,
     date: tx.date,
     end_date: tx.endDate,
-    is_waste: tx.isWaste,
+    is_waste: reflection.regret,
+    reflection_tag_ids: reflectionTagIds,
+    reflection_flags: reflection,
     note: tx.note,
     timestamp: tx.timestamp
   };
@@ -144,6 +179,9 @@ export const updateTransaction = async (tx: Transaction) => {
   const userId = await getUserId();
   if (!userId) return;
 
+  const reflection = createReflectionFlags(tx.reflection, tx.isWaste);
+  const reflectionTagIds = normalizeReflectionTagIds(tx, DEFAULT_REFLECTION_TAGS, DEFAULT_REFLECTION_TAGS[0]?.id);
+
   const payload = {
     name: tx.name,
     amount: tx.amount,
@@ -151,7 +189,9 @@ export const updateTransaction = async (tx: Transaction) => {
     member_ids: tx.memberIds,
     date: tx.date,
     end_date: tx.endDate,
-    is_waste: tx.isWaste,
+    is_waste: reflection.regret,
+    reflection_tag_ids: reflectionTagIds,
+    reflection_flags: reflection,
     note: tx.note,
     timestamp: tx.timestamp
   };
@@ -243,6 +283,77 @@ export const deleteCategory = async (id: string) => {
   if (!userId) return;
 
   await supabase.from('categories').delete().eq('id', id).eq('user_id', userId);
+};
+
+// --- Reflection Tags ---
+
+export const getReflectionTags = async (): Promise<ReflectionTag[]> => {
+  const userId = await getUserId();
+  if (!userId) return DEFAULT_REFLECTION_TAGS;
+
+  const { data, error } = await supabase
+    .from('reflection_tags')
+    .select('*')
+    .eq('user_id', userId)
+    .order('name');
+
+  if (error) {
+    console.warn("Fetch Reflection Tags Error (using defaults):", error.message);
+    return DEFAULT_REFLECTION_TAGS;
+  }
+  if (!data || data.length === 0) return DEFAULT_REFLECTION_TAGS;
+
+  return data.map((t: any) => ({
+    id: t.id,
+    name: t.name,
+    color: t.color,
+    icon: t.icon || undefined,
+  }));
+};
+
+export const getReflectionTagById = async (id: string): Promise<ReflectionTag | undefined> => {
+  const userId = await getUserId();
+  if (!userId) return undefined;
+
+  const { data } = await supabase
+    .from('reflection_tags')
+    .select('*')
+    .eq('id', id)
+    .eq('user_id', userId)
+    .single();
+  if (!data) return undefined;
+  return { id: data.id, name: data.name, color: data.color, icon: data.icon || undefined };
+};
+
+export const addReflectionTag = async (tag: ReflectionTag) => {
+  const userId = await getUserId();
+  if (!userId) return;
+
+  await supabase.from('reflection_tags').insert([{
+    id: tag.id,
+    user_id: userId,
+    name: tag.name,
+    color: tag.color,
+    icon: tag.icon || null,
+  }]);
+};
+
+export const updateReflectionTag = async (tag: ReflectionTag) => {
+  const userId = await getUserId();
+  if (!userId) return;
+
+  await supabase.from('reflection_tags').update({
+    name: tag.name,
+    color: tag.color,
+    icon: tag.icon || null,
+  }).eq('id', tag.id).eq('user_id', userId);
+};
+
+export const deleteReflectionTag = async (id: string) => {
+  const userId = await getUserId();
+  if (!userId) return;
+
+  await supabase.from('reflection_tags').delete().eq('id', id).eq('user_id', userId);
 };
 
 // --- Members ---
@@ -356,15 +467,20 @@ export const exportTransactionsToCSV = async () => {
     const transactions = await getTransactions();
     const categories = await getCategories();
     const members = await getMembers();
+  const reflectionTags = await getReflectionTags();
     const settings = await getSettings();
 
     // Header row
-    const headers = ['Date', 'Item Name', 'Amount', 'Category', 'Split With', 'Type', 'Is Waste', 'Note', 'End Date (Amortization)'];
+  const headers = ['Date', 'Item Name', 'Amount', 'Category', 'Split With', 'Type', 'Reflection Tags', 'Note', 'End Date (Amortization)'];
     
     const rows = transactions.map(tx => {
       const catName = categories.find(c => c.id === tx.categoryId)?.name || 'Unknown';
       const memberNames = tx.memberIds.map(mid => members.find(m => m.id === mid)?.name || mid).join(', ');
       const type = tx.endDate ? 'Long-term' : 'Instant';
+      const reflectionTagIds = normalizeReflectionTagIds(tx, reflectionTags, reflectionTags[0]?.id);
+      const reflectionLabel = reflectionTagIds
+        .map(id => reflectionTags.find(t => t.id === id)?.name || id)
+        .join(' | ');
       const clean = (str: string) => `"${(str || '').replace(/"/g, '""')}"`;
   
       return [
@@ -374,7 +490,7 @@ export const exportTransactionsToCSV = async () => {
         clean(catName),
         clean(memberNames),
         type,
-        tx.isWaste ? 'Yes' : 'No',
+        clean(reflectionLabel),
         clean(tx.note),
         tx.endDate || ''
       ].join(',');

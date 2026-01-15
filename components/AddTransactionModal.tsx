@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { getCategories, getMembers, addTransaction, updateTransaction, getTransactionById, getDaysDiff } from '../services/storageService';
-import { Category, Member, Transaction } from '../types';
+import { getCategories, getMembers, addTransaction, updateTransaction, getTransactionById, getDaysDiff, getReflectionTags } from '../services/storageService';
+import { Category, Member, Transaction, ReflectionTag } from '../types';
 import { Button, Modal } from '../components/ui';
-import { Info, Calendar, Clock, AlertTriangle, StickyNote } from 'lucide-react';
+import { Info, Calendar, Clock, StickyNote } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
+import { normalizeReflectionTagIds, toggleTagSelection } from '../utils/reflection';
 
 interface Props {
   isOpen: boolean;
@@ -24,9 +25,10 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
   const [note, setNote] = useState('');
   
   // Toggle States
-  const [isLongTerm, setIsLongTerm] = useState(false);
-  const [endDate, setEndDate] = useState('');
-  const [isWaste, setIsWaste] = useState(false);
+    const [isLongTerm, setIsLongTerm] = useState(false);
+    const [endDate, setEndDate] = useState('');
+    const [reflectionTags, setReflectionTags] = useState<ReflectionTag[]>([]);
+    const [selectedReflectionTagIds, setSelectedReflectionTagIds] = useState<string[]>([]);
   const [showOptions, setShowOptions] = useState(false); // Collapsed options
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,8 +39,10 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
     const fetchData = async () => {
         const cats = await getCategories();
         const mems = await getMembers();
+        const tags = await getReflectionTags();
         setCategories(cats);
         setMembers(mems);
+        setReflectionTags(tags);
 
         if (editId) {
             const tx = await getTransactionById(editId);
@@ -48,7 +52,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
                 setCategoryId(tx.categoryId);
                 setSelectedMembers(tx.memberIds);
                 setDate(tx.date);
-                setIsWaste(tx.isWaste);
+                setSelectedReflectionTagIds(normalizeReflectionTagIds(tx, tags));
                 setNote(tx.note || '');
                 
                 // Auto-expand options if there is extra info
@@ -72,7 +76,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
             setDate(new Date().toISOString().split('T')[0]);
             setIsLongTerm(false);
             setEndDate('');
-            setIsWaste(false);
+            setSelectedReflectionTagIds([]);
             setNote('');
             setShowOptions(false);
         }
@@ -89,22 +93,27 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
     );
   };
 
+    const toggleReflectionTag = (tagId: string) => {
+        setSelectedReflectionTagIds(prev => toggleTagSelection(prev, tagId));
+    };
+
   const handleSave = async () => {
     if (!amount || !categoryId || selectedMembers.length === 0) return;
     setLoading(true);
 
-    const tx: Transaction = {
-      id: editId || generateId(),
-      name,
-      amount: parseFloat(amount),
-      categoryId,
-      memberIds: selectedMembers,
-      date,
-      endDate: isLongTerm && endDate ? endDate : undefined,
-      isWaste,
-      note,
-      timestamp: editId ? (await getTransactionById(editId))?.timestamp || Date.now() : Date.now()
-    };
+        const tx: Transaction = {
+            id: editId || generateId(),
+            name,
+            amount: parseFloat(amount),
+            categoryId,
+            memberIds: selectedMembers,
+            date,
+            endDate: isLongTerm && endDate ? endDate : undefined,
+            isWaste: selectedReflectionTagIds.length > 0,
+            reflectionTagIds: selectedReflectionTagIds,
+            note,
+            timestamp: editId ? (await getTransactionById(editId))?.timestamp || Date.now() : Date.now()
+        };
 
     if (editId) {
         await updateTransaction(tx);
@@ -206,10 +215,10 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
         </div>
 
         {/* Quick Toggles Bar */}
-        <div className="flex gap-3 mb-6 relative z-0">
+        <div className="flex flex-wrap gap-3 mb-6 relative z-0">
             <button 
                 onClick={() => setShowOptions(!showOptions)}
-                className={`relative flex-1 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-colors ${
+                className={`relative flex-1 min-w-[160px] py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-colors ${
                     showOptions ? 'bg-slate-200 text-slate-900' : 'bg-white text-slate-600 shadow-sm'
                 }`}
             >
@@ -221,15 +230,23 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
                 )}
             </button>
             
-            <button 
-                onClick={() => setIsWaste(!isWaste)}
-                className={`flex-1 py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-colors ${
-                    isWaste ? 'bg-red-500 text-white shadow-sm' : 'bg-white text-slate-600 shadow-sm'
-                }`}
-            >
-                <AlertTriangle size={18} />
-                <span className="text-[13px]">{t('regret')}</span>
-            </button>
+            <div className="flex-1 flex gap-2 flex-wrap">
+                {reflectionTags.map(tag => {
+                    const isActive = selectedReflectionTagIds.includes(tag.id);
+                    return (
+                        <button
+                            key={tag.id}
+                            onClick={() => toggleReflectionTag(tag.id)}
+                            className={`flex-1 min-w-[110px] py-3 rounded-xl flex items-center justify-center gap-2 font-medium text-[13px] transition-colors ${
+                                isActive ? `${tag.color} shadow-sm` : 'bg-white text-slate-600 shadow-sm'
+                            }`}
+                        >
+                            {tag.icon && <span className="text-lg">{tag.icon}</span>}
+                            <span>{tag.name}</span>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
 
         {/* Collapsible Detailed Options */}

@@ -1,4 +1,4 @@
-import { Category, Member } from './types';
+import { Category, Member, ReflectionTag } from './types';
 
 export const INITIAL_MEMBERS: Member[] = [
   { id: 'm1', name: 'Me', avatar: '🧑' },
@@ -19,6 +19,12 @@ export const INITIAL_CATEGORIES: Category[] = [
 ];
 
 export const STORAGE_KEY = 'smartspend_data_v1';
+
+export const DEFAULT_REFLECTION_TAGS: ReflectionTag[] = [
+  { id: 'r1', name: 'Regret', color: 'bg-red-100 text-red-700', icon: '⚠️' },
+  { id: 'r2', name: 'Waste', color: 'bg-orange-100 text-orange-700', icon: '🗑️' },
+  { id: 'r3', name: 'Save', color: 'bg-emerald-100 text-emerald-700', icon: '🐖' },
+];
 
 export const CATEGORY_ICONS = [
   '🍔', '🍕', '☕', '🍺', '🍽️', 

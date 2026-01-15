@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getMembers, exportTransactionsToCSV, exportBackupJSON } from '../services/storageService';
+import { getMembers, getReflectionTags, exportTransactionsToCSV, exportBackupJSON } from '../services/storageService';
 import { Button, ListGroup, ListItem, Modal } from '../components/ui';
-import { ChevronRight, User, Share, Layers, Globe, Coins, Download, FileJson, FileSpreadsheet, Smartphone, LogOut } from 'lucide-react';
+import { ChevronRight, User, Share, Layers, Globe, Coins, Download, FileJson, FileSpreadsheet, Smartphone, LogOut, Tag } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -11,11 +11,13 @@ const SettingsPage: React.FC = () => {
   const { t, settings } = useSettings();
   const { user, signOut } = useAuth();
   const [memberCount, setMemberCount] = useState(0);
+  const [tagCount, setTagCount] = useState(0);
   const [showInstallModal, setShowInstallModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     getMembers().then(mems => setMemberCount(mems.length));
+    getReflectionTags().then(tags => setTagCount(tags.length));
   }, []);
 
   const handleLogout = async () => {
@@ -51,6 +53,16 @@ const SettingsPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
                 <ChevronRight size={20} className="text-slate-300" />
+            </div>
+            </ListItem>
+            <ListItem onClick={() => navigate('/settings/reflection-tags')}>
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 bg-purple-500 rounded-md flex items-center justify-center text-white"><Tag size={16} /></div>
+              <span className="text-[17px]">{t('reflectionTags')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[17px] text-slate-400">{tagCount} {t('items')}</span>
+              <ChevronRight size={20} className="text-slate-300" />
             </div>
             </ListItem>
             <ListItem onClick={() => navigate('/settings/members')}>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getCategories, getMembers, addTransaction, updateTransaction, getTransactionById, getDaysDiff } from '../services/storageService';
-import { Category, Member, Transaction } from '../types';
+import { getCategories, getMembers, addTransaction, updateTransaction, getTransactionById, getDaysDiff, getReflectionTags } from '../services/storageService';
+import { Category, Member, ReflectionTag, Transaction } from '../types';
 import { Button, ListGroup, ListItem } from '../components/ui';
 import { ChevronLeft, Info } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
+import { normalizeReflectionTagIds, toggleTagSelection } from '../utils/reflection';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -20,7 +21,8 @@ const AddTransaction: React.FC = () => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [isLongTerm, setIsLongTerm] = useState(false);
   const [endDate, setEndDate] = useState('');
-  const [isWaste, setIsWaste] = useState(false);
+  const [reflectionTags, setReflectionTags] = useState<ReflectionTag[]>([]);
+  const [selectedReflectionTagIds, setSelectedReflectionTagIds] = useState<string[]>([]);
   const [note, setNote] = useState('');
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -32,10 +34,13 @@ const AddTransaction: React.FC = () => {
         setCategories(cats);
         const loadedMembers = await getMembers();
         setMembers(loadedMembers);
+      const tags = await getReflectionTags();
+      setReflectionTags(tags);
         
         if (!id) {
             const me = loadedMembers.find(m => m.name === 'Me');
             if (me) setSelectedMembers([me.id]);
+        setSelectedReflectionTagIds([]);
         }
     
         if (id) {
@@ -46,7 +51,7 @@ const AddTransaction: React.FC = () => {
                 setCategoryId(tx.categoryId);
                 setSelectedMembers(tx.memberIds);
                 setDate(tx.date);
-                setIsWaste(tx.isWaste);
+          setSelectedReflectionTagIds(normalizeReflectionTagIds(tx, tags));
                 setNote(tx.note);
                 if (tx.endDate) {
                     setIsLongTerm(true);
@@ -62,6 +67,10 @@ const AddTransaction: React.FC = () => {
     setSelectedMembers(prev => 
       prev.includes(mId) ? prev.filter(m => m !== mId) : [...prev, mId]
     );
+  };
+
+  const toggleReflectionTag = (tagId: string) => {
+    setSelectedReflectionTagIds(prev => toggleTagSelection(prev, tagId));
   };
 
   const handleSave = async () => {
@@ -81,7 +90,8 @@ const AddTransaction: React.FC = () => {
       memberIds: selectedMembers,
       date,
       endDate: isLongTerm && endDate ? endDate : undefined,
-      isWaste,
+      isWaste: selectedReflectionTagIds.length > 0,
+      reflectionTagIds: selectedReflectionTagIds,
       note,
       timestamp: timestamp
     };
@@ -236,17 +246,23 @@ const AddTransaction: React.FC = () => {
         </ListGroup>
 
         <ListGroup title={t('reflection')}>
-           <ListItem isLast>
-            <div className="flex justify-between w-full items-center">
-              <span className="text-[16px] text-red-500">{t('regret')}</span>
-              <div 
-                onClick={() => setIsWaste(!isWaste)}
-                className={`w-[51px] h-[31px] rounded-full p-[2px] cursor-pointer transition-colors duration-200 ease-in-out ${isWaste ? 'bg-red-500' : 'bg-[#E9E9EA]'}`}
-              >
-                <div className={`w-[27px] h-[27px] bg-white rounded-full shadow-sm transform transition-transform duration-200 ${isWaste ? 'translate-x-[20px]' : 'translate-x-0'}`} />
-              </div>
-            </div>
-          </ListItem>
+          <div className="p-3 flex flex-wrap gap-2">
+            {reflectionTags.map(tag => {
+              const isActive = selectedReflectionTagIds.includes(tag.id);
+              return (
+                <button
+                  key={tag.id}
+                  onClick={() => toggleReflectionTag(tag.id)}
+                  className={`flex-1 min-w-[110px] px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 text-[14px] font-medium transition-colors ${
+                    isActive ? `${tag.color} shadow-sm` : 'bg-white text-slate-600 border border-slate-200'
+                  }`}
+                >
+                  {tag.icon && <span className="text-lg">{tag.icon}</span>}
+                  <span>{tag.name}</span>
+                </button>
+              );
+            })}
+          </div>
         </ListGroup>
 
         <ListGroup title={t('notes')}>

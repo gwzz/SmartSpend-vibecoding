@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTransactions, getCategories, getDailyCostForDate, deleteTransaction, exportBackupJSON } from '../services/storageService';
-import { Transaction, Category } from '../types';
+import { getTransactions, getCategories, getDailyCostForDate, deleteTransaction, exportBackupJSON, getReflectionTags } from '../services/storageService';
+import { Transaction, Category, ReflectionTag } from '../types';
 import { Card, ListItem, FloatingActionButton } from '../components/ui';
 import { Trash2, Search, XCircle, Plus, Download } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, Cell } from 'recharts';
 import AddTransactionModal from '../components/AddTransactionModal';
+import { normalizeReflectionTagIds } from '../utils/reflection';
+
+const REFLECTION_FILTER_PREFIX = 'reflection:';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { t, formatCurrency, settings } = useSettings();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [reflectionTags, setReflectionTags] = useState<ReflectionTag[]>([]);
   const [cashFlowToday, setCashFlowToday] = useState(0);
   const [chartData, setChartData] = useState<any[]>([]);
   
@@ -28,8 +32,10 @@ const HomePage: React.FC = () => {
   const loadData = async () => {
     const txs = await getTransactions();
     const cats = await getCategories();
+    const tags = await getReflectionTags();
     setTransactions(txs);
     setCategories(cats);
+    setReflectionTags(tags);
 
     const todayStr = new Date().toISOString().split('T')[0];
     
@@ -101,8 +107,12 @@ const HomePage: React.FC = () => {
     if (!matchesSearch) return false;
 
     if (filterType === 'all') return true;
-    if (filterType === 'waste') return tx.isWaste;
     if (filterType === 'longterm') return !!tx.endDate;
+    if (filterType.startsWith(REFLECTION_FILTER_PREFIX)) {
+      const tagId = filterType.replace(REFLECTION_FILTER_PREFIX, '');
+      const normalized = normalizeReflectionTagIds(tx, reflectionTags, reflectionTags[0]?.id);
+      return normalized.includes(tagId);
+    }
     
     return tx.categoryId === filterType;
   });
@@ -237,16 +247,21 @@ const HomePage: React.FC = () => {
              >
                All
              </button>
-             <button
-                onClick={() => setFilterType('waste')}
-                className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors whitespace-nowrap ${
-                  filterType === 'waste' 
-                    ? 'bg-red-500 text-white' 
-                    : 'bg-white text-slate-600 shadow-sm'
-                }`}
-             >
-               Waste
-             </button>
+             {reflectionTags.map(tag => {
+               const filterValue = `${REFLECTION_FILTER_PREFIX}${tag.id}`;
+               const isActive = filterType === filterValue;
+               return (
+                 <button
+                   key={`reflection-${tag.id}`}
+                   onClick={() => setFilterType(filterValue)}
+                   className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors whitespace-nowrap ${
+                     isActive ? `${tag.color} shadow-sm` : 'bg-white text-slate-600 shadow-sm'
+                   }`}
+                 >
+                   {tag.name}
+                 </button>
+               );
+             })}
              <button
                 onClick={() => setFilterType('longterm')}
                 className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition-colors whitespace-nowrap ${
@@ -255,7 +270,7 @@ const HomePage: React.FC = () => {
                     : 'bg-white text-slate-600 shadow-sm'
                 }`}
              >
-               Long-term
+               {t('longTerm')}
              </button>
              
              <div className="w-[1px] h-6 bg-slate-300 mx-1 self-center flex-shrink-0" />
@@ -302,6 +317,9 @@ const HomePage: React.FC = () => {
                 const isLast = index === displayedTransactions.length - 1;
                 const displayTitle = tx.name || cat?.name || t('newExpense');
                 const displaySubtitle = tx.name ? (tx.note || cat?.name) : tx.note;
+                const reflectionBadgeTags = normalizeReflectionTagIds(tx, reflectionTags, reflectionTags[0]?.id)
+                  .map(id => reflectionTags.find(tag => tag.id === id))
+                  .filter(Boolean) as ReflectionTag[];
 
                 return (
                   <ListItem key={tx.id} isLast={isLast} onClick={() => handleEdit(tx.id)}>
@@ -312,7 +330,18 @@ const HomePage: React.FC = () => {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-[16px] text-slate-900 truncate">{displayTitle}</span>
-                          {tx.isWaste && <div className="w-2 h-2 rounded-full bg-red-500" title={t('regret')} />}
+                          {reflectionBadgeTags.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              {reflectionBadgeTags.map(tag => (
+                                <span
+                                  key={tag.id}
+                                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${tag.color}`}
+                                >
+                                  {tag.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           {tx.endDate && <div className="w-2 h-2 rounded-full bg-blue-500" title={t('longTerm')} />}
                         </div>
                         <p className="text-[13px] text-slate-500 truncate">
