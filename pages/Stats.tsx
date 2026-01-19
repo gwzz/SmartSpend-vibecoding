@@ -7,7 +7,7 @@ import { useSettings } from '../contexts/SettingsContext';
 import { Category, Member, ReflectionTag, Transaction } from '../types';
 import { normalizeReflectionTagIds } from '../utils/reflection';
 
-const COLORS = ['#007AFF', '#34C759', '#FF9500', '#FF3B30', '#AF52DE', '#FF2D55', '#5856D6', '#8E8E93'];
+const COLORS = ['#3F7CAC', '#2EC4B6', '#F7B267', '#94A3B8', '#A78BFA', '#22C55E', '#0EA5E9', '#F97316'];
 
 type ViewMode = 'overview' | 'member' | 'category';
 
@@ -22,6 +22,7 @@ const StatsPage: React.FC = () => {
     const { t, formatCurrency, settings } = useSettings();
   
   // Data State
+    const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('overview');
   const [selectedFilterId, setSelectedFilterId] = useState<string>(''); // MemberID or CategoryID
   const [isEmpty, setIsEmpty] = useState(false);
@@ -63,6 +64,7 @@ const StatsPage: React.FC = () => {
             setPrimaryChartData([]);
             setSecondaryChartData([]);
             setReflectionTotals({});
+            setLoading(false);
             return;
         }
         setIsEmpty(false);
@@ -159,6 +161,7 @@ const StatsPage: React.FC = () => {
         setPrimaryChartData(catData);
         setSecondaryChartData(viewMode === 'overview' ? memData : []);
         }
+        setLoading(false);
     };
     calc();
 
@@ -171,38 +174,44 @@ const StatsPage: React.FC = () => {
     if (mode === 'category' && categories.length > 0) setSelectedFilterId(categories[0].id);
   };
 
-  return (
-    <div className="pt-safe pb-24 md:pb-8 px-4 md:px-6 bg-[#F2F2F7] min-h-screen">
-      <header className="pt-4 pb-4 md:pb-6">
-        <h1 className="text-[34px] font-bold text-slate-900 tracking-tight">{t('analysis')}</h1>
+    return (
+        <div className="pt-safe pb-24 md:pb-8 px-4 md:px-6 bg-brand-canvas min-h-screen">
+            <header className="pt-4 pb-4 md:pb-6">
+                <h1 className="text-[34px] font-bold text-brand-ink tracking-tight">{t('analysis')}</h1>
       </header>
 
-      {isEmpty ? (
-         <div className="flex flex-col items-center justify-center py-20 text-slate-400 min-h-[50vh]">
-             <div className="w-20 h-20 bg-slate-200 rounded-full flex items-center justify-center mb-4">
+            {loading ? (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-pulse">
+                        <div className="h-64 rounded-2xl bg-brand-surface border border-brand-border" />
+                        <div className="h-64 rounded-2xl bg-brand-surface border border-brand-border hidden md:block" />
+                        <div className="h-32 rounded-2xl bg-brand-surface border border-brand-border" />
+                 </div>
+            ) : isEmpty ? (
+                 <div className="flex flex-col items-center justify-center py-20 text-brand-muted min-h-[50vh]">
+                         <div className="w-20 h-20 bg-brand-surface rounded-full flex items-center justify-center mb-4 border border-brand-border">
                  <BarChart3 size={32} className="opacity-50" />
              </div>
-             <p className="text-lg font-medium text-slate-500">{t('noActivity')}</p>
+                         <p className="text-lg font-medium text-brand-muted">{t('noActivity')}</p>
          </div>
       ) : (
         <>
         {/* Mode Switcher */}
-        <div className="bg-[#E3E3E8] p-1 rounded-xl flex mb-6 max-w-lg">
+                <div className="bg-brand-surface p-1 rounded-xl flex mb-6 max-w-lg border border-brand-border/70 animate-fade-up">
             <button 
             onClick={() => handleTabChange('overview')}
-            className={`flex-1 py-1.5 text-[13px] font-medium rounded-lg transition-all ${viewMode === 'overview' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                        className={`flex-1 py-1.5 text-[13px] font-medium rounded-lg transition-all ${viewMode === 'overview' ? 'bg-brand-card shadow-soft text-brand-ink' : 'text-brand-muted'}`}
             >
             {t('overview')}
             </button>
             <button 
             onClick={() => handleTabChange('member')}
-            className={`flex-1 py-1.5 text-[13px] font-medium rounded-lg transition-all ${viewMode === 'member' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                        className={`flex-1 py-1.5 text-[13px] font-medium rounded-lg transition-all ${viewMode === 'member' ? 'bg-brand-card shadow-soft text-brand-ink' : 'text-brand-muted'}`}
             >
             {t('byMember')}
             </button>
             <button 
             onClick={() => handleTabChange('category')}
-            className={`flex-1 py-1.5 text-[13px] font-medium rounded-lg transition-all ${viewMode === 'category' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                        className={`flex-1 py-1.5 text-[13px] font-medium rounded-lg transition-all ${viewMode === 'category' ? 'bg-brand-card shadow-soft text-brand-ink' : 'text-brand-muted'}`}
             >
             {t('byCategory')}
             </button>
@@ -210,15 +219,15 @@ const StatsPage: React.FC = () => {
 
         {/* Sub Filters (Horizontal Scroll) */}
         {viewMode === 'member' && (
-            <div className="flex gap-3 overflow-x-auto no-scrollbar mb-6 pb-2">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar mb-6 pb-2 animate-fade-up">
             {members.map(m => (
                 <button
                 key={m.id}
                 onClick={() => setSelectedFilterId(m.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all whitespace-nowrap ${
                     selectedFilterId === m.id
-                    ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                    : 'bg-white border-slate-200 text-slate-600'
+                    ? 'bg-brand-primary border-brand-primary text-white shadow-soft'
+                    : 'bg-white border-brand-border text-brand-muted'
                 }`}
                 >
                 <span>{m.avatar}</span>
@@ -229,15 +238,15 @@ const StatsPage: React.FC = () => {
         )}
 
         {viewMode === 'category' && (
-            <div className="flex gap-3 overflow-x-auto no-scrollbar mb-6 pb-2">
+            <div className="flex gap-3 overflow-x-auto no-scrollbar mb-6 pb-2 animate-fade-up">
             {categories.map(c => (
                 <button
                 key={c.id}
                 onClick={() => setSelectedFilterId(c.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all whitespace-nowrap ${
                     selectedFilterId === c.id
-                    ? 'bg-slate-900 border-slate-900 text-white shadow-sm'
-                    : 'bg-white border-slate-200 text-slate-600'
+                    ? 'bg-brand-primary border-brand-primary text-white shadow-soft'
+                    : 'bg-white border-brand-border text-brand-muted'
                 }`}
                 >
                 <span>{c.icon}</span>
@@ -249,7 +258,7 @@ const StatsPage: React.FC = () => {
 
         {/* Reflection Monitors */}
         {reflectionTags.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6 animate-fade-up">
                 {reflectionTags.map(tag => {
                     const value = reflectionTotals[tag.id] || 0;
                     const percent = totalSpend > 0 ? Math.round((value / totalSpend) * 100) : 0;
@@ -260,16 +269,16 @@ const StatsPage: React.FC = () => {
                                 <div className={`p-1.5 rounded-md ${bg} ${text}`}>
                                     <span className="text-sm">{tag.icon || '🏷️'}</span>
                                 </div>
-                                <span className="text-[15px] font-semibold uppercase tracking-wide text-slate-600">
+                                <span className="text-[15px] font-semibold uppercase tracking-wide text-brand-muted">
                                     {tag.name}
                                 </span>
                             </div>
                             <div className="mt-2 flex items-baseline gap-2">
-                                <span className="text-3xl font-bold text-slate-900">{formatCurrency(value)}</span>
+                                <span className="text-3xl font-bold text-brand-ink">{formatCurrency(value)}</span>
                                 {totalSpend > 0 && (
-                                    <span className="text-sm text-slate-400">({percent}%)</span>
+                                    <span className="text-sm text-brand-muted">({percent}%)</span>
                                 )}
-                                <span className="text-slate-500 ml-1">{t('total')}</span>
+                                <span className="text-brand-muted ml-1">{t('total')}</span>
                             </div>
                         </Card>
                     );
@@ -277,10 +286,10 @@ const StatsPage: React.FC = () => {
             </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-up">
             {/* Primary Chart Area */}
             <div className="md:col-span-1 lg:col-span-1">
-                <h3 className="text-[13px] uppercase text-slate-500 font-normal px-4 mb-2 ml-1">
+                <h3 className="text-[13px] uppercase text-brand-muted font-semibold px-4 mb-2 ml-1">
                     {viewMode === 'category' ? t('spendingByMember') : t('spendingByCategory')}
                 </h3>
                 
@@ -296,7 +305,7 @@ const StatsPage: React.FC = () => {
                             contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
                             formatter={(value: number) => formatCurrency(value)} 
                         />
-                        <Bar dataKey="value" fill="#007AFF" radius={[0, 4, 4, 0]} barSize={24} />
+                        <Bar dataKey="value" fill="#3F7CAC" radius={[0, 4, 4, 0]} barSize={24} />
                         </BarChart>
                     ) : (
                         <PieChart>
@@ -335,7 +344,7 @@ const StatsPage: React.FC = () => {
                     {primaryChartData.slice(0, 6).map((entry, index) => (
                         <div key={index} className="flex items-center gap-2 text-[13px]">
                         <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                        <span className="text-slate-600 truncate flex-1">{entry.name}</span>
+                        <span className="text-brand-muted truncate flex-1">{entry.name}</span>
                         <span className="font-semibold">{Math.round((entry.value / (totalSpend || 1)) * 100)}%</span>
                         </div>
                     ))}
@@ -347,7 +356,7 @@ const StatsPage: React.FC = () => {
             {/* Secondary Chart Area (Only for Overview - spending by member) */}
             {viewMode === 'overview' && (
                 <div className="md:col-span-1 lg:col-span-1">
-                    <h3 className="text-[13px] uppercase text-slate-500 font-normal px-4 mb-2 ml-1">{t('spendingByMember')}</h3>
+                    <h3 className="text-[13px] uppercase text-brand-muted font-semibold px-4 mb-2 ml-1">{t('spendingByMember')}</h3>
                     <Card className="p-4 h-[22rem] md:h-[24rem] flex flex-col overflow-hidden">
                         <div className="flex-1">
                         <ResponsiveContainer width="100%" height="100%">
@@ -359,7 +368,7 @@ const StatsPage: React.FC = () => {
                                 contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}}
                                 formatter={(value: number) => formatCurrency(value)} 
                             />
-                            <Bar dataKey="value" fill="#007AFF" radius={[0, 4, 4, 0]} barSize={24} />
+                            <Bar dataKey="value" fill="#3F7CAC" radius={[0, 4, 4, 0]} barSize={24} />
                         </BarChart>
                         </ResponsiveContainer>
                         </div>

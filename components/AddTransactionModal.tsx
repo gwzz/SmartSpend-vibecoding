@@ -196,8 +196,8 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
                     onClick={() => toggleMember(m.id)}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-full border transition-all whitespace-nowrap ${
                         isSelected
-                        ? 'bg-[#007AFF] border-[#007AFF] text-white shadow-sm'
-                        : 'bg-white border-slate-200 text-slate-600'
+                        ? 'bg-brand-primary border-brand-primary text-white shadow-soft'
+                        : 'bg-white border-brand-border text-slate-600'
                     }`}
                     >
                     <span className="text-sm">{m.avatar}</span>
@@ -219,14 +219,14 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
             <button 
                 onClick={() => setShowOptions(!showOptions)}
                 className={`relative flex-1 min-w-[160px] py-3 rounded-xl flex items-center justify-center gap-2 font-medium transition-colors ${
-                    showOptions ? 'bg-slate-200 text-slate-900' : 'bg-white text-slate-600 shadow-sm'
+                    showOptions ? 'bg-brand-surface text-brand-ink border border-brand-border' : 'bg-white text-slate-600 shadow-sm'
                 }`}
             >
                 <Calendar size={18} />
                 <span className="text-[13px]">{date === new Date().toISOString().split('T')[0] ? t('today') : date}</span>
                 {/* Dot indicator if details are hidden but present */}
                 {!showOptions && (isLongTerm || note) && (
-                    <div className="absolute top-2 right-3 w-1.5 h-1.5 bg-[#007AFF] rounded-full" />
+                    <div className="absolute top-2 right-3 w-1.5 h-1.5 bg-brand-primary rounded-full" />
                 )}
             </button>
             
@@ -251,7 +251,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
 
         {/* Collapsible Detailed Options */}
         {showOptions && (
-            <div className="bg-white rounded-xl p-4 mb-6 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="bg-white rounded-xl p-4 mb-6 shadow-sm border border-brand-border animate-in fade-in slide-in-from-top-2 duration-200">
                  {/* Date Picker */}
                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
                     <span className="text-sm text-slate-600">{t('date')}</span>
@@ -259,7 +259,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
                         type="date" 
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        className="text-sm bg-transparent text-right focus:outline-none text-[#007AFF]"
+                        className="text-sm bg-transparent text-right focus:outline-none text-brand-primary"
                     />
                  </div>
 
@@ -271,7 +271,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
                     </div>
                     <div 
                         onClick={() => setIsLongTerm(!isLongTerm)}
-                        className={`w-[40px] h-[24px] rounded-full p-[2px] cursor-pointer transition-colors ${isLongTerm ? 'bg-[#34C759]' : 'bg-slate-200'}`}
+                        className={`w-[40px] h-[24px] rounded-full p-[2px] cursor-pointer transition-colors ${isLongTerm ? 'bg-brand-accent' : 'bg-slate-200'}`}
                     >
                         <div className={`w-[20px] h-[20px] bg-white rounded-full shadow-sm transform transition-transform ${isLongTerm ? 'translate-x-[16px]' : 'translate-x-0'}`} />
                     </div>
@@ -284,7 +284,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
                             type="date" 
                             value={endDate}
                             onChange={(e) => setEndDate(e.target.value)}
-                            className="text-sm bg-transparent text-right focus:outline-none text-[#007AFF]"
+                            className="text-sm bg-transparent text-right focus:outline-none text-brand-primary"
                         />
                     </div>
                  )}
@@ -304,7 +304,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
                  </div>
 
                  {dailyCostPreview && (
-                     <div className="mt-3 bg-blue-50 p-2 rounded-lg flex items-center justify-center gap-2 text-[#007AFF]">
+                     <div className="mt-3 bg-brand-surface p-2 rounded-lg flex items-center justify-center gap-2 text-brand-primary border border-brand-border">
                         <Info size={14} />
                         <span className="text-xs font-semibold">{t('trueCost')}: {formatCurrency(dailyCostPreview)} {t('perDay')}</span>
                      </div>
@@ -312,13 +312,18 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
             </div>
         )}
 
-        <Button 
-            onClick={handleSave} 
-            disabled={!amount || !categoryId || selectedMembers.length === 0 || loading}
-            className={`${(!amount || !categoryId) ? 'opacity-30' : ''}`}
-        >
-            {loading ? 'Saving...' : (editId ? t('update') : t('save'))}
-        </Button>
+        <div className="space-y-2">
+            {(!amount || !categoryId || selectedMembers.length === 0) && (
+                <p className="text-xs text-brand-muted">Add amount, category, and member to save.</p>
+            )}
+            <Button 
+                onClick={handleSave} 
+                disabled={!amount || !categoryId || selectedMembers.length === 0 || loading}
+                className={`${(!amount || !categoryId) ? 'opacity-40' : ''}`}
+            >
+                {loading ? 'Saving...' : (editId ? t('update') : t('save'))}
+            </Button>
+        </div>
     </Modal>
   );
 };

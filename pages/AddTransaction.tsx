@@ -27,6 +27,7 @@ const AddTransaction: React.FC = () => {
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const isValid = amount !== '' && categoryId !== '' && selectedMembers.length > 0;
 
   useEffect(() => {
     const loadData = async () => {
@@ -111,12 +112,12 @@ const AddTransaction: React.FC = () => {
   const currencySymbol = (0).toLocaleString(undefined, { style: 'currency', currency: settings.currency }).replace(/\d|\s|\./g, '');
 
   return (
-    <div className="pt-safe pb-24 min-h-screen bg-[#F2F2F7]">
+    <div className="pt-safe pb-24 min-h-screen bg-brand-canvas">
       {id ? (
-        <div className="px-4 py-2 flex items-center justify-between sticky top-0 z-50 bg-[#F2F2F7]/90 backdrop-blur-sm">
+        <div className="px-4 py-2 flex items-center justify-between sticky top-0 z-50 bg-brand-canvas/90 backdrop-blur-sm">
           <button 
             onClick={() => navigate(-1)} 
-            className="flex items-center text-[#007AFF] active:opacity-50 -ml-2"
+            className="flex items-center text-brand-primary active:opacity-50 -ml-2"
           >
             <ChevronLeft size={24} />
             <span className="text-[17px]">{t('back')}</span>
@@ -125,7 +126,7 @@ const AddTransaction: React.FC = () => {
           <div className="w-16"></div>
         </div>
       ) : (
-        <header className="px-4 pt-4 pb-6 sticky top-0 z-40 bg-[#F2F2F7]">
+        <header className="px-4 pt-4 pb-6 sticky top-0 z-40 bg-brand-canvas">
           <h1 className="text-[34px] font-bold text-slate-900 tracking-tight">{t('newExpense')}</h1>
         </header>
       )}
@@ -185,8 +186,8 @@ const AddTransaction: React.FC = () => {
                   onClick={() => toggleMember(m.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-all whitespace-nowrap ${
                     isSelected
-                      ? 'bg-[#007AFF] border-[#007AFF] text-white shadow-sm'
-                      : 'bg-white border-slate-200 text-slate-600'
+                        ? 'bg-brand-primary border-brand-primary text-white shadow-soft'
+                        : 'bg-white border-brand-border text-slate-600'
                   }`}
                 >
                   <span className="text-sm">{m.avatar}</span>
@@ -209,7 +210,7 @@ const AddTransaction: React.FC = () => {
                 type="date" 
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="text-[16px] text-[#007AFF] bg-transparent text-right focus:outline-none"
+                 className="text-[16px] text-brand-primary bg-transparent text-right focus:outline-none"
              />
           </ListItem>
           
@@ -218,7 +219,7 @@ const AddTransaction: React.FC = () => {
               <span className="text-[16px]">{t('longTerm')}</span>
               <div 
                 onClick={() => setIsLongTerm(!isLongTerm)}
-                className={`w-[51px] h-[31px] rounded-full p-[2px] cursor-pointer transition-colors duration-200 ease-in-out ${isLongTerm ? 'bg-[#34C759]' : 'bg-[#E9E9EA]'}`}
+                className={`w-[51px] h-[31px] rounded-full p-[2px] cursor-pointer transition-colors duration-200 ease-in-out ${isLongTerm ? 'bg-brand-accent' : 'bg-[#E9E9EA]'}`}
               >
                 <div className={`w-[27px] h-[27px] bg-white rounded-full shadow-sm transform transition-transform duration-200 ${isLongTerm ? 'translate-x-[20px]' : 'translate-x-0'}`} />
               </div>
@@ -228,17 +229,17 @@ const AddTransaction: React.FC = () => {
           {isLongTerm && (
              <ListItem isLast={!dailyCostPreview}>
                <span className="text-[16px]">{t('endsOn')}</span>
-               <input 
+              <input 
                   type="date" 
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="text-[16px] text-[#007AFF] bg-transparent text-right focus:outline-none"
+                className="text-[16px] text-brand-primary bg-transparent text-right focus:outline-none"
                />
              </ListItem>
           )}
 
           {dailyCostPreview && (
-            <div className="bg-blue-50/50 p-3 flex items-center justify-center gap-2 text-[#007AFF]">
+            <div className="bg-brand-surface p-3 flex items-center justify-center gap-2 text-brand-primary border border-brand-border rounded-xl">
                <Info size={14} />
                <span className="text-[13px] font-medium">{t('trueCost')}: {formatCurrency(dailyCostPreview)} {t('perDay')}</span>
             </div>
@@ -276,11 +277,14 @@ const AddTransaction: React.FC = () => {
           </div>
         </ListGroup>
 
-        <div className="pt-2 pb-6">
+        <div className="pt-2 pb-6 space-y-2">
+          {!isValid && (
+            <p className="text-xs text-brand-muted">Select amount, category, and at least one member to save.</p>
+          )}
           <Button 
             onClick={handleSave} 
-            disabled={!amount || !categoryId || selectedMembers.length === 0}
-            className={`${(!amount || !categoryId) ? 'opacity-30' : ''}`}
+            disabled={!isValid}
+            className={`${!isValid ? 'opacity-40' : ''}`}
           >
             {id ? t('updateExpense') : t('saveExpense')}
           </Button>

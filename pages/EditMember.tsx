@@ -50,12 +50,12 @@ const EditMember: React.FC = () => {
   };
 
   return (
-    <div className="pt-safe pb-10 min-h-screen bg-[#F2F2F7]">
+    <div className="pt-safe pb-10 min-h-screen bg-brand-canvas">
       {/* Header */}
-      <div className="px-4 py-2 flex items-center justify-between sticky top-0 z-50 bg-[#F2F2F7]/90 backdrop-blur-sm">
+      <div className="px-4 py-2 flex items-center justify-between sticky top-0 z-50 bg-brand-canvas/90 backdrop-blur-sm">
         <button 
           onClick={() => navigate(-1)} 
-          className="flex items-center text-[#007AFF] active:opacity-50 -ml-2"
+          className="flex items-center text-brand-primary active:opacity-50 -ml-2"
         >
           <ChevronLeft size={24} />
           <span className="text-[17px]">{t('back')}</span>

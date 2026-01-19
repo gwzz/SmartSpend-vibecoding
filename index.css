@@ -1,18 +1,20 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Lato:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* iOS System Fonts */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Lato', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: #F2F2F7; /* Match theme color to prevent flashing */
+  background-color: #FDFDFD;
+  color: #0F172A;
   margin: 0;
   height: 100%;
 }
 
 html {
-  background-color: #F2F2F7;
+  background-color: #FDFDFD;
   height: 100%;
 }
 

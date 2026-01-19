@@ -67,11 +67,11 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F2F2F7] flex flex-col justify-center items-center px-6">
+    <div className="min-h-screen bg-brand-canvas flex flex-col justify-center items-center px-6">
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-[#007AFF] mb-2">💸 SmartSpend</h1>
-          <p className="text-slate-500">Track your family expenses efficiently.</p>
+          <h1 className="text-4xl font-bold text-brand-primary mb-2" style={{ fontFamily: 'Poppins, Nunito, system-ui, sans-serif' }}>💸 SmartSpend</h1>
+          <p className="text-brand-muted">Track your family expenses efficiently.</p>
         </div>
 
         <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
@@ -85,7 +85,7 @@ const LoginPage: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-[#007AFF]/20 focus:bg-white transition-all outline-none"
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-brand-primary/20 focus:bg-white transition-all outline-none"
                 placeholder="hello@example.com"
               />
             </div>
@@ -97,7 +97,7 @@ const LoginPage: React.FC = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-[#007AFF]/20 focus:bg-white transition-all outline-none"
+                className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none focus:ring-2 focus:ring-brand-primary/20 focus:bg-white transition-all outline-none"
                 placeholder="••••••••"
               />
             </div>
@@ -119,7 +119,7 @@ const LoginPage: React.FC = () => {
                   setIsSignUp(!isSignUp);
                   setError(null);
               }}
-              className="text-sm text-[#007AFF] font-medium hover:underline"
+              className="text-sm text-brand-primary font-medium hover:underline"
             >
               {isSignUp ? 'Already have an account? Sign In' : 'New here? Create Account'}
             </button>

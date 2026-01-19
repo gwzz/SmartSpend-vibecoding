@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMembers, getReflectionTags, exportTransactionsToCSV, exportBackupJSON } from '../services/storageService';
-import { Button, ListGroup, ListItem, Modal } from '../components/ui';
+import { Button, ListGroup, ListItem, Modal, Card, Badge } from '../components/ui';
 import { ChevronRight, User, Share, Layers, Globe, Coins, Download, FileJson, FileSpreadsheet, Smartphone, LogOut, Tag } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,21 +28,47 @@ const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="pt-safe pb-24 md:pb-10 px-4 md:px-6 bg-[#F2F2F7] min-h-screen">
-      <header className="pt-4 pb-6 md:pt-8">
-        <h1 className="text-[34px] font-bold text-slate-900 tracking-tight">{t('settings')}</h1>
+    <div className="pt-safe pb-24 md:pb-12 px-4 md:px-6 bg-brand-canvas min-h-screen">
+      <header className="pt-4 pb-6 md:pt-8 flex items-center justify-between">
+        <div>
+          <p className="text-[12px] uppercase tracking-[0.2em] text-brand-muted font-semibold">{t('settings')}</p>
+          <h1 className="text-[32px] md:text-[34px] font-bold text-brand-ink tracking-tight">{t('appSettings')}</h1>
+        </div>
+        <Badge variant="outline">v1.3.0</Badge>
       </header>
     
-      <div className="max-w-2xl">
+      <div className="max-w-3xl space-y-6">
         {/* User Profile */}
-        <div className="flex items-center gap-4 mb-8 bg-white p-4 rounded-xl shadow-sm border border-slate-100/50">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center text-3xl">
+        <Card className="p-5 md:p-6 flex items-center gap-4">
+          <div className="w-16 h-16 bg-brand-surface rounded-2xl border border-brand-border flex items-center justify-center text-3xl shadow-soft">
             🧑
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-[19px] truncate text-brand-ink">{user?.email || t('myHousehold')}</h3>
+            <p className="text-[14px] text-brand-muted">{t('premiumPlan')}</p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 text-brand-muted text-sm">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            Cloud sync on
+          </div>
+        </Card>
+
+        {/* Quick stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Card className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[12px] uppercase text-brand-muted font-semibold tracking-wide">{t('members')}</p>
+              <p className="text-2xl font-bold text-brand-ink">{memberCount}</p>
             </div>
-            <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-[19px] truncate">{user?.email || t('myHousehold')}</h3>
-            <p className="text-[14px] text-slate-500">{t('premiumPlan')}</p>
+            <div className="w-10 h-10 rounded-xl bg-brand-primary/10 text-brand-primary flex items-center justify-center">👥</div>
+          </Card>
+          <Card className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-[12px] uppercase text-brand-muted font-semibold tracking-wide">{t('reflectionTags')}</p>
+              <p className="text-2xl font-bold text-brand-ink">{tagCount}</p>
             </div>
+            <div className="w-10 h-10 rounded-xl bg-brand-accent/10 text-brand-accent flex items-center justify-center">🏷️</div>
+          </Card>
         </div>
 
         <ListGroup title={t('general')}>
@@ -133,11 +159,11 @@ const SettingsPage: React.FC = () => {
             </ListItem>
         </ListGroup>
 
-        <div className="mt-8">
-            <Button variant="danger" onClick={handleLogout} className="flex items-center gap-2">
-                <LogOut size={20} />
-                Sign Out
-            </Button>
+        <div className="mt-6">
+          <Button variant="danger" onClick={handleLogout} className="flex items-center gap-2">
+            <LogOut size={20} />
+            Sign Out
+          </Button>
         </div>
       </div>
 
@@ -148,11 +174,11 @@ const SettingsPage: React.FC = () => {
       {/* Install Guide Modal */}
       <Modal isOpen={showInstallModal} onClose={() => setShowInstallModal(false)} title={t('installInstructions')}>
         <div className="p-4 space-y-6">
-           <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+           <div className="bg-brand-card p-4 rounded-xl border border-brand-border shadow-soft">
               <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
                 <span>🍎</span> iOS (Safari)
               </h3>
-              <ul className="space-y-3 text-[15px] text-slate-600">
+              <ul className="space-y-3 text-[15px] text-brand-ink">
                 <li className="flex gap-2">
                   <span className="font-bold text-slate-300">1</span>
                   {t('iosStep1')}
@@ -168,11 +194,11 @@ const SettingsPage: React.FC = () => {
               </ul>
            </div>
 
-           <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+             <div className="bg-brand-card p-4 rounded-xl border border-brand-border shadow-soft">
               <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
                 <span>🤖</span> Android (Chrome)
               </h3>
-              <ul className="space-y-3 text-[15px] text-slate-600">
+                <ul className="space-y-3 text-[15px] text-brand-ink">
                 <li className="flex gap-2">
                   <span className="font-bold text-slate-300">1</span>
                   {t('androidStep1')}
