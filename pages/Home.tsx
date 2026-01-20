@@ -16,8 +16,7 @@ const HomePage: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [reflectionTags, setReflectionTags] = useState<ReflectionTag[]>([]);
-  const [cashFlowToday, setCashFlowToday] = useState(0);
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [timeframe, setTimeframe] = useState<'7d' | '30d' | '90d'>('7d');
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,33 +41,7 @@ const HomePage: React.FC = () => {
     setTransactions(txs);
     setCategories(cats);
     setReflectionTags(tags);
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    
-    // Calculate last 7 days cost
-    const last7 = [];
-    const today = new Date();
-    // Normalize today to start of day for comparison
-    today.setHours(0,0,0,0);
-
-    for (let i = 6; i >= 0; i--) {
-       const d = new Date(today);
-       d.setDate(today.getDate() - i);
-       const dateStr = d.toISOString().split('T')[0];
-       const amount = getDailyCostForDate(dateStr, txs);
-       last7.push({
-         day: d.toLocaleDateString(settings.language === 'zh' ? 'zh-CN' : 'en-US', { weekday: 'narrow' }),
-         date: dateStr,
-         amount: amount
-       });
-    }
-    setChartData(last7);
-
-    // Cashflow Calculation
-    const cashFlow = txs
-      .filter(t => t.date === todayStr)
-      .reduce((sum, t) => sum + t.amount, 0);
-    setCashFlowToday(cashFlow);
+    return { txs, cats, tags };
   };
 
   useEffect(() => {
@@ -114,6 +87,47 @@ const HomePage: React.FC = () => {
 
   const getCategory = (id: string) => categories.find(c => c.id === id);
 
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const selectedDate = dateFilter || todayStr;
+
+  const chartData = useMemo(() => {
+    const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
+    const locale = settings.language === 'zh' ? 'zh-CN' : 'en-US';
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+
+    const formatLocalDate = (d: Date) => {
+      const y = d.getFullYear();
+      const m = `${d.getMonth() + 1}`.padStart(2, '0');
+      const day = `${d.getDate()}`.padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const data = [] as { day: string; date: string; amount: number }[];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(base);
+      d.setDate(base.getDate() - i);
+      const dateStr = formatLocalDate(d);
+      const label = days <= 7
+        ? d.toLocaleDateString(locale, { weekday: 'narrow' })
+        : d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+      const amount = getDailyCostForDate(dateStr, transactions);
+      data.push({ day: label, date: dateStr, amount });
+    }
+    return data;
+  }, [transactions, timeframe, settings.language]);
+
+  const cashFlowForSelected = useMemo(() => {
+    return transactions
+      .filter(t => t.date === selectedDate)
+      .reduce((sum, t) => sum + t.amount, 0);
+  }, [transactions, selectedDate]);
+
+  const barChartWidth = useMemo(() => {
+    const bar = timeframe === '7d' ? 36 : timeframe === '30d' ? 22 : 16;
+    return Math.max(360, bar * chartData.length + 40);
+  }, [timeframe, chartData.length]);
+
   const allReflectionsSelected = reflectionTags.length > 0 && selectedReflections.size === reflectionTags.length;
   const allCategoriesSelected = categories.length > 0 && selectedCategories.size === categories.length;
 
@@ -153,8 +167,6 @@ const HomePage: React.FC = () => {
     : (isExpanded || isFiltering)
       ? sortedTransactions
       : sortedTransactions.slice(0, 10);
-
-  const todayStr = new Date().toISOString().split('T')[0];
 
   return (
     <div className="pt-safe pb-24 md:pb-8 md:pt-6 bg-brand-canvas">
@@ -199,13 +211,39 @@ const HomePage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Last 7 Days Chart */}
             <Card className="p-4 md:col-span-2">
-                <h2 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">{t('last7Days')}</h2>
-                <div className="h-44 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+                <div className="flex items-center justify-between mb-2 gap-3">
+                  <h2 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('last7Days')}</h2>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold">
+                    {([
+                      { key: '7d', label: '7D' },
+                      { key: '30d', label: '30D' },
+                      { key: '90d', label: '90D' },
+                    ] as const).map(opt => (
+                      <button
+                        key={opt.key}
+                        onClick={() => setTimeframe(opt.key)}
+                        className={`px-2.5 py-1 rounded-full border text-xs transition-all ${timeframe === opt.key ? 'bg-brand-primary text-white border-brand-primary' : 'bg-white text-slate-600 border-slate-200 hover:border-brand-primary/50'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="h-52 w-full overflow-x-auto">
+                  <div style={{ width: barChartWidth, height: '100%' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                             <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                                 {chartData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.date === todayStr ? '#3F7CAC' : '#E2E8F0'} />
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={entry.date === selectedDate ? '#3F7CAC' : '#E2E8F0'}
+                                  onClick={() => {
+                                    setDateFilter(entry.date);
+                                    setIsExpanded(true);
+                                  }}
+                                  style={{ cursor: 'pointer' }}
+                                />
                                 ))}
                             </Bar>
                             <Tooltip 
@@ -225,22 +263,24 @@ const HomePage: React.FC = () => {
                                 dataKey="day" 
                                 axisLine={false} 
                                 tickLine={false} 
-                                tick={{fontSize: 12, fill: '#94a3b8'}} 
-                                dy={5}
-                                interval={0}
+                              tick={{fontSize: 11, fill: '#94a3b8'}} 
+                              dy={5}
+                              interval={0}
+                              minTickGap={4}
                             />
                         </BarChart>
                     </ResponsiveContainer>
+                        </div>
                 </div>
             </Card>
 
             {/* Cash Flow Card */}
             <Card className="p-4 flex flex-row md:flex-col lg:justify-between items-center md:items-start justify-between h-full">
                 <div>
-                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('cashFlow')}</p>
-                    <p className="text-[10px] text-slate-400">{t('spentToday')}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('cashFlow')}</p>
+                  <p className="text-[10px] text-slate-400">{selectedDate === todayStr ? t('spentToday') : new Date(selectedDate).toLocaleDateString()}</p>
                 </div>
-                <h2 className="text-3xl font-bold text-slate-900 tracking-tight mt-2">{formatCurrency(cashFlowToday)}</h2>
+                <h2 className="text-3xl font-bold text-slate-900 tracking-tight mt-2">{formatCurrency(cashFlowForSelected)}</h2>
                 <div className="hidden md:block w-full h-1 bg-slate-100 rounded-full mt-4 overflow-hidden">
                   <div className="h-full bg-brand-primary/50 w-3/4 opacity-50"></div> 
                   {/* Placeholder progress bar */}
@@ -502,6 +542,12 @@ const HomePage: React.FC = () => {
       <AddTransactionModal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
+        onSaved={async (d) => {
+          await loadData();
+          setDateFilter(d || todayStr);
+          setTimeframe('7d');
+          setIsExpanded(true);
+        }}
         editId={editingId}
       />
     </div>

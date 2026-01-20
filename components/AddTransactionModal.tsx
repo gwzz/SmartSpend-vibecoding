@@ -7,14 +7,15 @@ import { useSettings } from '../contexts/SettingsContext';
 import { normalizeReflectionTagIds, toggleTagSelection } from '../utils/reflection';
 
 interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  editId?: string | null;
+    isOpen: boolean;
+    onClose: () => void;
+    onSaved?: (date: string) => void;
+    editId?: string | null;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
+const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSaved, editId }) => {
   const { t, formatCurrency, settings } = useSettings();
   
   const [name, setName] = useState('');
@@ -121,6 +122,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, editId }) => {
         await addTransaction(tx);
     }
     setLoading(false);
+    if (onSaved) onSaved(tx.date);
     onClose();
   };
 

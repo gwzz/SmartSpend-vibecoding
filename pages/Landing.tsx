@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, BarChart } from 'lucide-react';
+import { LogIn, UserPlus } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 
 const LandingPage: React.FC = () => {
@@ -24,18 +24,18 @@ const LandingPage: React.FC = () => {
               </p>
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/auth', { state: { mode: 'signup' } })}
                   className="inline-flex items-center justify-center px-5 py-3 rounded-pill bg-white text-brand-primary font-semibold shadow-card hover:-translate-y-0.5 hover:shadow-glass transition-all"
                 >
-                  <Plus size={18} />
-                  <span className="ml-2">{t('heroCtaPrimary')}</span>
+                  <UserPlus size={18} />
+                  <span className="ml-2">{t('signUp')}</span>
                 </button>
                 <button
-                  onClick={() => navigate('/stats')}
+                  onClick={() => navigate('/auth', { state: { mode: 'login' } })}
                   className="inline-flex items-center justify-center px-5 py-3 rounded-pill border border-white/60 text-white font-semibold hover:bg-white/10 transition-all"
                 >
-                  <BarChart size={18} className="mr-2" />
-                  {t('heroCtaSecondary')}
+                  <LogIn size={18} className="mr-2" />
+                  {t('login')}
                 </button>
               </div>
             </div>
@@ -56,6 +56,20 @@ const LandingPage: React.FC = () => {
           <span className="font-semibold text-brand-ink">{t('socialProofTrusted')}</span>
           <span className="inline-flex items-center gap-1 text-amber-500">★★★★★</span>
           <span className="text-brand-muted">{t('socialProofSecure')}</span>
+        </div>
+      </section>
+
+      {/* Access note */}
+      <section className="px-4 md:px-6 mt-4">
+        <div className="flex items-center gap-3 text-sm text-brand-muted bg-brand-card border border-brand-border rounded-lg px-4 py-3 shadow-soft flex-wrap">
+          <span className="text-brand-primary text-base">🔒</span>
+          <span className="flex-1 min-w-[200px]">{t('authRequiredNote')}</span>
+          <button
+            onClick={() => navigate('/auth', { state: { mode: 'signup' } })}
+            className="text-brand-primary font-semibold hover:underline"
+          >
+            {t('authRequiredCta')}
+          </button>
         </div>
       </section>
 
@@ -148,11 +162,11 @@ const LandingPage: React.FC = () => {
             <p className="text-white/85 mt-2">{t('ctaBannerSubtitle')}</p>
           </div>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/auth', { state: { mode: 'signup' } })}
             className="inline-flex items-center justify-center px-6 py-3 rounded-pill bg-white text-brand-primary font-semibold shadow-card hover:-translate-y-0.5 hover:shadow-glass transition-all"
           >
-            <Plus size={18} className="mr-2" />
-            {t('ctaBannerCta')}
+            <UserPlus size={18} className="mr-2" />
+            {t('signUp')}
           </button>
         </div>
       </section>

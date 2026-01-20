@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { Button } from '../components/ui';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,6 +20,12 @@ const LoginPage: React.FC = () => {
       navigate('/');
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    const state = location.state as { mode?: string } | undefined;
+    if (state?.mode === 'signup') setIsSignUp(true);
+    if (state?.mode === 'login') setIsSignUp(false);
+  }, [location.state]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -51,6 +51,12 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+const EntryRoute: React.FC = () => {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-brand-surface text-brand-muted">Loading…</div>;
+  return user ? <Layout /> : <LandingPage />;
+};
+
 const Layout: React.FC = () => {
   const location = useLocation();
   // Only show bottom nav on main tabs on mobile
@@ -168,6 +174,7 @@ const App: React.FC = () => {
         <HashRouter>
           <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-brand-surface text-brand-muted">Loading…</div>}>
             <Routes>
+              <Route path="/" element={<EntryRoute />} />
               <Route path="/landing" element={<LandingPage />} />
               <Route path="/auth" element={<LoginPage />} />
               <Route path="/*" element={

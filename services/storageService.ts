@@ -520,43 +520,49 @@ export const exportBackupJSON = async () => {
 };
 
 // Simplified logic for calculating daily cost without fetching everything locally
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+const parseDateToUTC = (dateStr: string): number => {
+    if (!dateStr) return NaN;
+    const parts = dateStr.split('-').map(part => parseInt(part, 10));
+    if (parts.length !== 3 || parts.some(num => Number.isNaN(num))) return NaN;
+    const [year, month, day] = parts;
+    return Date.UTC(year, month - 1, day);
+};
+
 export const getDailyCostForDate = (dateStr: string, transactions: Transaction[]): number => {
-    const targetDate = new Date(dateStr);
-    targetDate.setHours(0,0,0,0);
-    const targetTime = targetDate.getTime();
-  
+    const targetTime = parseDateToUTC(dateStr);
+    if (Number.isNaN(targetTime)) return 0;
+
     let total = 0;
-  
+
     transactions.forEach(tx => {
-      const start = new Date(tx.date);
-      start.setHours(0,0,0,0);
-      const startTime = start.getTime();
-  
-      if (tx.endDate) {
-        const end = new Date(tx.endDate);
-        end.setHours(0,0,0,0);
-        const endTime = end.getTime();
-        if (targetTime >= startTime && targetTime <= endTime) {
-          const days = getDaysDiff(tx.date, tx.endDate);
-          total += tx.amount / days;
+        const startTime = parseDateToUTC(tx.date);
+        if (Number.isNaN(startTime)) return;
+
+        if (tx.endDate) {
+            const endTime = parseDateToUTC(tx.endDate);
+            if (Number.isNaN(endTime)) return;
+
+            if (targetTime >= startTime && targetTime <= endTime) {
+                const days = Math.max(1, getDaysDiff(tx.date, tx.endDate));
+                total += tx.amount / days;
+            }
+        } else if (startTime === targetTime) {
+            total += tx.amount;
         }
-      } else {
-        if (startTime === targetTime) {
-          total += tx.amount;
-        }
-      }
     });
-  
+
     return total;
 };
 
 export const getDaysDiff = (start: string, end: string): number => {
-    const d1 = new Date(start);
-    const d2 = new Date(end);
-    d1.setHours(0,0,0,0);
-    d2.setHours(0,0,0,0);
-    const diffTime = Math.abs(d2.getTime() - d1.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    const startTime = parseDateToUTC(start);
+    const endTime = parseDateToUTC(end);
+    if (Number.isNaN(startTime) || Number.isNaN(endTime)) return 1;
+
+    const diff = Math.abs(endTime - startTime);
+    return Math.floor(diff / MS_PER_DAY) + 1;
 };
 
 export const formatCurrency = (amount: number, currencyCode: string = 'USD') => {
