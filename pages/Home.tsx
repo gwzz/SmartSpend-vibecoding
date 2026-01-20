@@ -161,11 +161,18 @@ const HomePage: React.FC = () => {
       {/* Live snapshot (usage-first) */}
       <section className="px-4 md:px-6 mt-10 space-y-4 md:space-y-6">
         <div className="flex justify-between items-end">
-          <div>
-            <p className="text-[13px] font-semibold text-brand-muted uppercase">
-              {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p>
-            <h2 className="text-3xl font-bold text-brand-ink tracking-tight">{t('today')}</h2>
+          <div className="flex items-center gap-4">
+            <img
+              src="/assets/app-theme-pic.jpeg"
+              alt="SmartSpend logo"
+              className="w-14 h-14 rounded-2xl shadow-soft border border-brand-border object-cover"
+            />
+            <div>
+              <p className="text-[13px] font-semibold text-brand-muted uppercase">
+                {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+              </p>
+              <h2 className="text-3xl font-bold text-brand-ink tracking-tight">{t('today')}</h2>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button 
