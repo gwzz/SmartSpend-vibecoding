@@ -54,4 +54,37 @@ export type CurrencyCode = 'USD' | 'CNY' | 'EUR' | 'JPY' | 'GBP';
 export interface AppSettings {
   language: Language;
   currency: CurrencyCode;
+  // Daily spending limit; 0 means "no limit set"
+  dailySpendLimit?: number;
+}
+
+// --- Notifications ---
+export type NotificationSeverity = 'info' | 'warning' | 'danger';
+export type NotificationSource = 'system' | 'user' | 'integration';
+
+export type NotificationActionType = 'navigate';
+
+export interface NotificationAction {
+  id: string;
+  type: NotificationActionType;
+  label: string;
+  to: string;
+}
+
+export interface AppNotification {
+  id: string; // stable unique id (e.g. ruleKey + date)
+  createdAt: number;
+  updatedAt?: number;
+  readAt?: number;
+  dismissedAt?: number;
+
+  source: NotificationSource;
+  severity: NotificationSeverity;
+  title: string;
+  message: string;
+
+  actions?: NotificationAction[];
+
+  // Optional metadata for routing/extensibility
+  data?: Record<string, any>;
 }

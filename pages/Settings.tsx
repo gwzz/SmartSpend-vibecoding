@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getMembers, getReflectionTags, exportTransactionsToCSV, exportBackupJSON } from '../services/storageService';
 import { Button, ListGroup, ListItem, Modal, Card, Badge } from '../components/ui';
-import { ChevronRight, User, Share, Layers, Globe, Coins, Download, FileJson, FileSpreadsheet, Smartphone, LogOut, Tag } from 'lucide-react';
+import { ChevronRight, User, Share, Layers, Globe, Coins, Download, FileJson, FileSpreadsheet, Smartphone, LogOut, Tag, Target } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { useAuth } from '../contexts/AuthContext';
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { t, settings } = useSettings();
+  const { t, settings, formatCurrency } = useSettings();
   const { user, signOut } = useAuth();
   const [memberCount, setMemberCount] = useState(0);
   const [tagCount, setTagCount] = useState(0);
@@ -122,6 +122,16 @@ const SettingsPage: React.FC = () => {
             <div className="flex items-center gap-2">
                 <span className="text-[17px] text-slate-400">{settings.currency}</span>
                 <ChevronRight size={20} className="text-slate-300" />
+            </div>
+            </ListItem>
+            <ListItem onClick={() => navigate('/settings/daily-limit')}>
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 bg-emerald-500 rounded-md flex items-center justify-center text-white"><Target size={16} /></div>
+              <span className="text-[17px]">{t('dailySpendLimit')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[17px] text-slate-400">{(settings.dailySpendLimit ?? 0) > 0 ? formatCurrency(settings.dailySpendLimit ?? 0) : t('noLimit')}</span>
+              <ChevronRight size={20} className="text-slate-300" />
             </div>
             </ListItem>
             <ListItem onClick={() => setShowInstallModal(true)} isLast>

@@ -1,18 +1,25 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getTransactions, getCategories, getDailyCostForDate, deleteTransaction, exportBackupJSON, getReflectionTags } from '../services/storageService';
 import { Transaction, Category, ReflectionTag } from '../types';
 import { Card, ListItem, FloatingActionButton } from '../components/ui';
 import { Trash2, Search, XCircle, Plus, Download, ChevronDown, Check } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
-import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, Cell } from 'recharts';
+import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, Cell, ReferenceLine } from 'recharts';
 import AddTransactionModal from '../components/AddTransactionModal';
 import { normalizeReflectionTagIds, deriveReflectionFromTransaction } from '../utils/reflection';
+import { NotificationBell } from '../components/NotificationCenter';
+import { useNotifications } from '../contexts/NotificationsContext';
+import { evaluateDailyLimitRules } from '../services/notificationRules';
+import { applyNotificationDelta } from '../services/notificationRuntime';
 
 const REFLECTION_FILTER_PREFIX = 'reflection:';
 const REFLECTION_FLAG_PREFIX = 'reflectionFlag:';
 
 const HomePage: React.FC = () => {
+  const navigate = useNavigate();
   const { t, formatCurrency, settings } = useSettings();
+  const notifications = useNotifications();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [reflectionTags, setReflectionTags] = useState<ReflectionTag[]>([]);
@@ -90,6 +97,12 @@ const HomePage: React.FC = () => {
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const selectedDate = dateFilter || todayStr;
 
+  const todaySpend = useMemo(() => {
+    return transactions
+      .filter(tx => tx.date === todayStr)
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [transactions, todayStr]);
+
   const chartData = useMemo(() => {
     const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
     const locale = settings.language === 'zh' ? 'zh-CN' : 'en-US';
@@ -123,10 +136,149 @@ const HomePage: React.FC = () => {
       .reduce((sum, t) => sum + t.amount, 0);
   }, [transactions, selectedDate]);
 
+  const dailyLimit = useMemo(() => {
+    const v = settings.dailySpendLimit ?? 0;
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  }, [settings.dailySpendLimit]);
+
+  const chartColor = useMemo(() => {
+    const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+    const maxAmount = Math.max(1, ...chartData.map(d => d.amount));
+
+    const colorForAmount = (amount: number) => {
+      if (!dailyLimit || dailyLimit <= 0) {
+        const t = clamp(amount / maxAmount, 0, 1);
+        const l = 92 - t * 26; // 92% -> 66%
+        return `hsl(215 55% ${l}%)`;
+      }
+
+      const ratio = amount / dailyLimit;
+      if (ratio <= 1) {
+        const t = clamp(ratio, 0, 1);
+        const l = 95 - t * 30; // 95% -> 65%
+        return `hsl(150 55% ${l}%)`;
+      }
+
+      const over = clamp(ratio - 1, 0, 2);
+      const t = clamp(over / 2, 0, 1);
+      const l = 92 - t * 30; // 92% -> 62%
+      return `hsl(0 70% ${l}%)`;
+    };
+
+    return { colorForAmount };
+  }, [chartData, dailyLimit]);
+
+  const limitContext = useMemo(() => {
+    if (!dailyLimit) return null;
+    const delta = dailyLimit - cashFlowForSelected;
+    const progress = Math.min(1, cashFlowForSelected / dailyLimit);
+    return { delta, progress };
+  }, [dailyLimit, cashFlowForSelected]);
+
+  useEffect(() => {
+    // Evaluate notification rules whenever today's spend or limit changes.
+    const delta = evaluateDailyLimitRules({
+      todaySpend,
+      dailyLimit,
+      formatted: {
+        spend: formatCurrency(todaySpend),
+        limit: formatCurrency(dailyLimit),
+      },
+      localeStrings: {
+        limitExceededTitle: t('limitExceededTitle'),
+        limitExceededMessage: (spend, limit) => t('limitExceededMessage').replace('{spend}', spend).replace('{limit}', limit),
+        noLimitTitle: t('noLimitTitle'),
+        noLimitMessage: t('noLimitMessage'),
+        setLimitAction: t('setLimitAction'),
+        adjustLimitAction: t('adjustLimitAction'),
+        reviewSpendAction: t('reviewSpendAction'),
+      },
+    });
+
+    applyNotificationDelta(delta, {
+      upsert: notifications.upsert,
+      remove: notifications.remove,
+    });
+  }, [todaySpend, dailyLimit, t, formatCurrency, notifications.upsert, notifications.remove]);
+
   const barChartWidth = useMemo(() => {
     const bar = timeframe === '7d' ? 36 : timeframe === '30d' ? 22 : 16;
     return Math.max(360, bar * chartData.length + 40);
   }, [timeframe, chartData.length]);
+
+  const monthGrid = useMemo(() => {
+    if (timeframe === '7d') return null;
+
+    const locale = settings.language === 'zh' ? 'zh-CN' : 'en-US';
+    const dayNames = settings.language === 'zh'
+      ? ['日', '一', '二', '三', '四', '五', '六']
+      : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+    const formatLocalDate = (d: Date) => {
+      const y = d.getFullYear();
+      const m = `${d.getMonth() + 1}`.padStart(2, '0');
+      const day = `${d.getDate()}`.padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const monthsToShow = timeframe === '30d' ? 1 : 3;
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+
+    const months = Array.from({ length: monthsToShow }, (_, i) => {
+      const d = new Date(base.getFullYear(), base.getMonth() - i, 1);
+      const year = d.getFullYear();
+      const monthIndex = d.getMonth();
+      const start = new Date(year, monthIndex, 1);
+      const end = new Date(year, monthIndex + 1, 0);
+      const daysInMonth = end.getDate();
+
+      const days = Array.from({ length: daysInMonth }, (_, dayIdx) => {
+        const dayNum = dayIdx + 1;
+        const date = new Date(year, monthIndex, dayNum);
+        const dateStr = formatLocalDate(date);
+        const amount = getDailyCostForDate(dateStr, transactions);
+        return { date: dateStr, dayNum, amount };
+      });
+
+      return {
+        id: `${year}-${monthIndex}`,
+        title: start.toLocaleDateString(locale, { month: 'long', year: 'numeric' }),
+        firstDow: start.getDay(),
+        days,
+      };
+    });
+
+    const allAmounts = months.flatMap(m => m.days.map(d => d.amount));
+    const maxAmount = Math.max(1, ...allAmounts);
+
+    const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+    const colorForAmount = (amount: number): { bg: string; textClass: string } => {
+      if (!dailyLimit || dailyLimit <= 0) {
+        const t = clamp(amount / maxAmount, 0, 1);
+        const l = 96 - t * 28; // 96% -> 68%
+        const dark = t > 0.75;
+        return { bg: `hsl(215 30% ${l}%)`, textClass: dark ? 'text-white' : 'text-slate-700' };
+      }
+
+      const ratio = amount / dailyLimit;
+      if (ratio <= 1) {
+        const t = clamp(ratio, 0, 1);
+        const l = 95 - t * 30; // 95% -> 65%
+        const dark = t > 0.7;
+        return { bg: `hsl(150 55% ${l}%)`, textClass: dark ? 'text-white' : 'text-emerald-900' };
+      }
+
+      const over = clamp(ratio - 1, 0, 2);
+      const t = clamp(over / 2, 0, 1);
+      const l = 92 - t * 30; // 92% -> 62%
+      const dark = t > 0.35;
+      return { bg: `hsl(0 70% ${l}%)`, textClass: dark ? 'text-white' : 'text-red-900' };
+    };
+
+    return { dayNames, months, colorForAmount };
+  }, [timeframe, settings.language, dailyLimit, transactions]);
 
   const allReflectionsSelected = reflectionTags.length > 0 && selectedReflections.size === reflectionTags.length;
   const allCategoriesSelected = categories.length > 0 && selectedCategories.size === categories.length;
@@ -194,6 +346,7 @@ const HomePage: React.FC = () => {
                 <Plus size={18} />
                 <span className="text-sm font-semibold">{t('add')}</span>
             </button>
+            <NotificationBell />
             <button 
                 onClick={exportBackupJSON}
                 className="h-9 w-9 bg-white rounded-full flex items-center justify-center text-brand-muted shadow-sm border border-brand-border active:scale-95 transition-transform"
@@ -201,9 +354,14 @@ const HomePage: React.FC = () => {
             >
                 <Download size={18} />
             </button>
-            <div className="h-9 w-9 bg-brand-surface rounded-full flex items-center justify-center text-lg border border-brand-border overflow-hidden">
-                👤
-            </div>
+            <button
+              onClick={() => navigate('/settings')}
+              className="h-9 w-9 bg-brand-surface rounded-full flex items-center justify-center text-lg border border-brand-border overflow-hidden active:scale-95 transition-transform"
+              title={t('settings')}
+              aria-label={t('settings')}
+            >
+              👤
+            </button>
           </div>
         </div>
         
@@ -212,7 +370,7 @@ const HomePage: React.FC = () => {
             {/* Last 7 Days Chart */}
             <Card className="p-4 md:col-span-2">
                 <div className="flex items-center justify-between mb-2 gap-3">
-                  <h2 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{t('last7Days')}</h2>
+                  <h2 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">{timeframe === '7d' ? t('last7Days') : t('spendCalendar')}</h2>
                   <div className="flex items-center gap-2 text-[11px] font-semibold">
                     {([
                       { key: '7d', label: '7D' },
@@ -229,49 +387,118 @@ const HomePage: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                <div className="h-52 w-full overflow-x-auto">
-                  <div style={{ width: barChartWidth, height: '100%' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
-                            <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                                {chartData.map((entry, index) => (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={entry.date === selectedDate ? '#3F7CAC' : '#E2E8F0'}
-                                  onClick={() => {
-                                    setDateFilter(entry.date);
-                                    setIsExpanded(true);
-                                  }}
-                                  style={{ cursor: 'pointer' }}
+                {timeframe === '7d' ? (
+                  <div className="h-52 w-full overflow-x-auto">
+                    <div style={{ width: barChartWidth, height: '100%' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+                              {dailyLimit > 0 && (
+                                <ReferenceLine
+                                  y={dailyLimit}
+                                  stroke="#94a3b8"
+                                  strokeDasharray="4 4"
+                                  ifOverflow="extendDomain"
                                 />
-                                ))}
-                            </Bar>
-                            <Tooltip 
-                                cursor={{fill: 'transparent'}}
-                                content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
+                              )}
+                              <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                                  {chartData.map((entry, index) => (
+                                  (() => {
+                                    const isSelected = entry.date === selectedDate;
+                                    const fill = dailyLimit > 0 ? chartColor.colorForAmount(entry.amount) : (isSelected ? '#3F7CAC' : '#E2E8F0');
                                     return (
-                                        <div className="bg-slate-900 text-white text-xs py-1 px-2 rounded shadow-lg">
-                                        {formatCurrency(payload[0].value as number)}
-                                        </div>
+                                  <Cell
+                                    key={`cell-${index}`}
+                                    fill={fill}
+                                    stroke={isSelected ? '#1D4ED8' : 'transparent'}
+                                    strokeWidth={isSelected ? 2 : 0}
+                                    onClick={() => {
+                                      setDateFilter(entry.date);
+                                      setIsExpanded(true);
+                                    }}
+                                    style={{ cursor: 'pointer' }}
+                                  />
                                     );
-                                    }
-                                    return null;
-                                }}
-                            />
-                            <XAxis 
-                                dataKey="day" 
-                                axisLine={false} 
-                                tickLine={false} 
-                              tick={{fontSize: 11, fill: '#94a3b8'}} 
-                              dy={5}
-                              interval={0}
-                              minTickGap={4}
-                            />
-                        </BarChart>
-                    </ResponsiveContainer>
+                                  })()
+                                  ))}
+                              </Bar>
+                              <Tooltip 
+                                  cursor={{fill: 'transparent'}}
+                                  content={({ active, payload }) => {
+                                      if (active && payload && payload.length) {
+                                      return (
+                                          <div className="bg-slate-900 text-white text-xs py-1 px-2 rounded shadow-lg">
+                                          {formatCurrency(payload[0].value as number)}
+                                          </div>
+                                      );
+                                      }
+                                      return null;
+                                  }}
+                              />
+                              <XAxis 
+                                  dataKey="day" 
+                                  axisLine={false} 
+                                  tickLine={false} 
+                                tick={{fontSize: 11, fill: '#94a3b8'}} 
+                                dy={5}
+                                interval={0}
+                                minTickGap={4}
+                              />
+                          </BarChart>
+                      </ResponsiveContainer>
+                          </div>
+                  </div>
+                ) : (
+                  <div className="h-52 w-full">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex gap-2">
+                        {monthGrid?.dayNames.map((d, i) => (
+                          <div key={i} className="w-8 text-center text-[10px] font-semibold text-slate-400">{d}</div>
+                        ))}
+                      </div>
+                      {dailyLimit > 0 && (
+                        <div className="text-[11px] text-slate-400">
+                          {t('dailySpendLimit')}: {formatCurrency(dailyLimit)}
                         </div>
-                </div>
+                      )}
+                    </div>
+
+                    <div className="h-[10.25rem] overflow-y-auto pr-1">
+                      <div className="space-y-3">
+                        {monthGrid?.months.map(month => (
+                          <div key={month.id}>
+                            <div className="mb-2 text-[12px] font-semibold text-slate-600">{month.title}</div>
+                            <div className="grid grid-cols-7 gap-2">
+                              {Array.from({ length: month.firstDow }, (_, idx) => (
+                                <div key={`pad-${month.id}-${idx}`} className="w-8 h-8 rounded-md bg-transparent" />
+                              ))}
+                              {month.days.map(day => {
+                                const amount = day.amount;
+                                const isSelected = day.date === selectedDate;
+                                const over = dailyLimit > 0 && amount > dailyLimit;
+                                const title = `${day.date} • ${formatCurrency(amount)}${dailyLimit > 0 ? (over ? ` • ${t('overBy')} ${formatCurrency(amount - dailyLimit)}` : ` • ${t('remaining')} ${formatCurrency(dailyLimit - amount)}`) : ''}`;
+                                const style = monthGrid.colorForAmount(amount);
+                                return (
+                                  <button
+                                    key={day.date}
+                                    title={title}
+                                    onClick={() => {
+                                      setDateFilter(day.date);
+                                      setIsExpanded(true);
+                                    }}
+                                    className={`w-8 h-8 rounded-md border transition-all flex items-center justify-center text-[11px] font-semibold ${style.textClass} ${isSelected ? 'ring-2 ring-brand-primary border-brand-primary' : 'border-slate-200 hover:border-brand-primary/50'}`}
+                                    style={{ backgroundColor: style.bg }}
+                                  >
+                                    {day.dayNum}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
             </Card>
 
             {/* Cash Flow Card */}
@@ -281,10 +508,37 @@ const HomePage: React.FC = () => {
                   <p className="text-[10px] text-slate-400">{selectedDate === todayStr ? t('spentToday') : new Date(selectedDate).toLocaleDateString()}</p>
                 </div>
                 <h2 className="text-3xl font-bold text-slate-900 tracking-tight mt-2">{formatCurrency(cashFlowForSelected)}</h2>
-                <div className="hidden md:block w-full h-1 bg-slate-100 rounded-full mt-4 overflow-hidden">
-                  <div className="h-full bg-brand-primary/50 w-3/4 opacity-50"></div> 
-                  {/* Placeholder progress bar */}
-                </div>
+                {dailyLimit > 0 ? (
+                  <div className="hidden md:block w-full mt-4">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
+                      <span>{t('dailySpendLimit')}</span>
+                      <span>{formatCurrency(dailyLimit)}</span>
+                    </div>
+                    <div className="mt-2 w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${cashFlowForSelected <= dailyLimit ? 'bg-emerald-500/70' : 'bg-red-500/70'}`}
+                        style={{ width: `${Math.min(1, cashFlowForSelected / dailyLimit) * 100}%` }}
+                      />
+                    </div>
+                    {limitContext && (
+                      <div className="mt-2 text-[11px] text-slate-500">
+                        {limitContext.delta >= 0 ? (
+                          <span>
+                            {t('remaining')}: <span className="font-semibold text-emerald-700">{formatCurrency(limitContext.delta)}</span>
+                          </span>
+                        ) : (
+                          <span>
+                            {t('overBy')}: <span className="font-semibold text-red-700">{formatCurrency(Math.abs(limitContext.delta))}</span>
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="hidden md:block w-full mt-4 text-[11px] text-slate-400">
+                    {t('noLimitHint')}
+                  </div>
+                )}
             </Card>
         </div>
 

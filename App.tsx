@@ -4,6 +4,7 @@ import { House, ChartPie, Settings as SettingsIcon } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 import { initStoragePersistence } from './services/storageService';
 
 const HomePage = lazy(() => import('./pages/Home'));
@@ -17,6 +18,7 @@ const MemberList = lazy(() => import('./pages/MemberList'));
 const EditMember = lazy(() => import('./pages/EditMember'));
 const LanguageSettings = lazy(() => import('./pages/LanguageSettings'));
 const CurrencySettings = lazy(() => import('./pages/CurrencySettings'));
+const DailyLimitSettings = lazy(() => import('./pages/DailyLimitSettings'));
 const ReflectionTagList = lazy(() => import('./pages/ReflectionTagList'));
 const EditReflectionTag = lazy(() => import('./pages/EditReflectionTag'));
 
@@ -107,6 +109,7 @@ const Layout: React.FC = () => {
               <Route path="/settings/reflection-tags/edit/:id" element={<EditReflectionTag />} />
               <Route path="/settings/language" element={<LanguageSettings />} />
               <Route path="/settings/currency" element={<CurrencySettings />} />
+              <Route path="/settings/daily-limit" element={<DailyLimitSettings />} />
             </Routes>
           </Suspense>
         </div>
@@ -171,20 +174,22 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <SettingsProvider>
-        <HashRouter>
-          <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-brand-surface text-brand-muted">Loading…</div>}>
-            <Routes>
-              <Route path="/" element={<EntryRoute />} />
-              <Route path="/landing" element={<LandingPage />} />
-              <Route path="/auth" element={<LoginPage />} />
-              <Route path="/*" element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              } />
-            </Routes>
-          </Suspense>
-        </HashRouter>
+        <NotificationsProvider>
+          <HashRouter>
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-brand-surface text-brand-muted">Loading…</div>}>
+              <Routes>
+                <Route path="/" element={<EntryRoute />} />
+                <Route path="/landing" element={<LandingPage />} />
+                <Route path="/auth" element={<LoginPage />} />
+                <Route path="/*" element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </Suspense>
+          </HashRouter>
+        </NotificationsProvider>
       </SettingsProvider>
     </AuthProvider>
   );

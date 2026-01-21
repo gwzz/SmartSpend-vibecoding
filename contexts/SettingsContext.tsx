@@ -17,7 +17,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const { user } = useAuth(); // Refresh settings when user changes
   const [settings, setSettings] = useState<AppSettings>({
     language: 'en',
-    currency: 'USD'
+    currency: 'USD',
+    dailySpendLimit: 0
   });
 
   useEffect(() => {

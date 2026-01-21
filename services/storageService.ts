@@ -424,7 +424,29 @@ export const deleteMember = async (id: string) => {
 
 // --- Settings ---
 
-const DEFAULT_SETTINGS: AppSettings = { language: 'en', currency: 'USD' };
+const DEFAULT_SETTINGS: AppSettings = { language: 'en', currency: 'USD', dailySpendLimit: 0 };
+
+const dailyLimitStorageKey = (userId: string) => `smartspend:dailySpendLimit:${userId}`;
+
+const readDailyLimitFromLocalStorage = (userId: string): number => {
+  try {
+    const raw = localStorage.getItem(dailyLimitStorageKey(userId));
+    if (!raw) return 0;
+    const num = parseFloat(raw);
+    return Number.isFinite(num) && num >= 0 ? num : 0;
+  } catch {
+    return 0;
+  }
+};
+
+const writeDailyLimitToLocalStorage = (userId: string, value: number) => {
+  try {
+    const clean = Number.isFinite(value) && value >= 0 ? value : 0;
+    localStorage.setItem(dailyLimitStorageKey(userId), String(clean));
+  } catch {
+    // ignore
+  }
+};
 
 export const getSettings = async (): Promise<AppSettings> => {
     const userId = await getUserId();
@@ -440,25 +462,53 @@ export const getSettings = async (): Promise<AppSettings> => {
         console.warn("Error fetching settings:", error.message);
     }
     
+    const fallbackLimit = readDailyLimitFromLocalStorage(userId);
+
     if (data) {
-        return { language: data.language as any, currency: data.currency as any };
+      const dailySpendLimit =
+        typeof (data as any).daily_spend_limit === 'number'
+          ? (data as any).daily_spend_limit
+          : typeof (data as any).daily_limit === 'number'
+            ? (data as any).daily_limit
+            : typeof (data as any).dailySpendLimit === 'number'
+              ? (data as any).dailySpendLimit
+              : fallbackLimit;
+
+      return {
+        language: data.language as any,
+        currency: data.currency as any,
+        dailySpendLimit: Number.isFinite(dailySpendLimit) && dailySpendLimit >= 0 ? dailySpendLimit : fallbackLimit,
+      };
     }
-    return DEFAULT_SETTINGS;
+    return { ...DEFAULT_SETTINGS, dailySpendLimit: fallbackLimit };
 };
 
 export const saveSettings = async (settings: AppSettings) => {
     const userId = await getUserId();
     if (!userId) return;
 
+  const dailySpendLimit = Number.isFinite(settings.dailySpendLimit as number) && (settings.dailySpendLimit as number) >= 0
+    ? (settings.dailySpendLimit as number)
+    : 0;
+
     // Upsert settings
     const { error } = await supabase.from('user_settings').upsert({
-        user_id: userId,
-        language: settings.language,
-        currency: settings.currency,
-        updated_at: new Date().toISOString()
+      user_id: userId,
+      language: settings.language,
+      currency: settings.currency,
+      daily_limit: dailySpendLimit,
+      updated_at: new Date().toISOString()
     });
-    
-    if (error) console.error("Save Settings Error:", error.message);
+
+    if (error) {
+      // If schema doesn't have the column yet, we still persist locally.
+      console.warn("Save Settings Error:", error.message);
+      writeDailyLimitToLocalStorage(userId, dailySpendLimit);
+      return;
+    }
+
+    // Keep local in sync as a fallback cache.
+    writeDailyLimitToLocalStorage(userId, dailySpendLimit);
 };
 
 // --- Utils (Export/Import/Calc) ---
