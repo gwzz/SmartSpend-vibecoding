@@ -255,6 +255,10 @@ const HomePage: React.FC = () => {
     const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
     const colorForAmount = (amount: number): { bg: string; textClass: string } => {
+      // For the 30/90-day calendar view, visually distinguish "no spend" days.
+      if (amount <= 0) {
+        return { bg: '#F1F5F9', textClass: 'text-slate-600' };
+      }
       if (!dailyLimit || dailyLimit <= 0) {
         const t = clamp(amount / maxAmount, 0, 1);
         const l = 96 - t * 28; // 96% -> 68%
