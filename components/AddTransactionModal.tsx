@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getCategories, getMembers, addTransaction, updateTransaction, getTransactionById, getDaysDiff, getReflectionTags } from '../services/storageService';
 import { Category, Member, Transaction, ReflectionTag } from '../types';
 import { Button, Modal } from '../components/ui';
@@ -35,6 +35,9 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSaved, editId
   const [categories, setCategories] = useState<Category[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const endDateRequiredMessage = settings.language === 'zh' ? '长期支出需要结束日期。' : 'Long-term expenses require an end date.';
+  const endDateOrderMessage = settings.language === 'zh' ? '结束日期不能早于开始日期。' : 'End date must be on or after the start date.';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -48,6 +51,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSaved, editId
         if (editId) {
             const tx = await getTransactionById(editId);
             if (tx) {
+                setValidationError(null);
                 setName(tx.name || '');
                 setAmount(tx.amount.toString());
                 setCategoryId(tx.categoryId);
@@ -69,6 +73,7 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSaved, editId
             }
         } else {
             // Reset for new
+            setValidationError(null);
             setName('');
             setAmount('');
             setCategoryId(cats[0]?.id || '');
@@ -88,6 +93,11 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSaved, editId
     }
   }, [isOpen, editId]);
 
+  useEffect(() => {
+    if (!validationError) return;
+    setValidationError(null);
+  }, [date, endDate, isLongTerm]);
+
   const toggleMember = (mId: string) => {
     setSelectedMembers(prev => 
       prev.includes(mId) ? prev.filter(m => m !== mId) : [...prev, mId]
@@ -100,6 +110,16 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSaved, editId
 
   const handleSave = async () => {
     if (!amount || !categoryId || selectedMembers.length === 0) return;
+    if (isLongTerm && !endDate) {
+      setValidationError(endDateRequiredMessage);
+      return;
+    }
+    if (isLongTerm && endDate && endDate < date) {
+      setValidationError(endDateOrderMessage);
+      return;
+    }
+
+    setValidationError(null);
     setLoading(true);
 
         const tx: Transaction = {
@@ -126,9 +146,12 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSaved, editId
     onClose();
   };
 
-  const dailyCostPreview = isLongTerm && endDate && amount 
-    ? parseFloat(amount) / getDaysDiff(date, endDate) 
-    : null;
+  const dailyCostPreview = useMemo(() => {
+    if (!isLongTerm || !endDate || !amount) return null;
+    const days = getDaysDiff(date, endDate);
+    if (days <= 0) return null;
+    return parseFloat(amount) / days;
+  }, [amount, date, endDate, isLongTerm]);
 
   const currencySymbol = (0).toLocaleString(undefined, { style: 'currency', currency: settings.currency }).replace(/\d|\s|\./g, '');
 
@@ -317,6 +340,9 @@ const AddTransactionModal: React.FC<Props> = ({ isOpen, onClose, onSaved, editId
         <div className="space-y-2">
             {(!amount || !categoryId || selectedMembers.length === 0) && (
                 <p className="text-xs text-brand-muted">Add amount, category, and member to save.</p>
+            )}
+            {validationError && (
+                <p className="text-xs text-red-600">{validationError}</p>
             )}
             <Button 
                 onClick={handleSave} 

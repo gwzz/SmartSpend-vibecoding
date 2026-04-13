@@ -1,20 +1,26 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTransactions, getCategories, getDailyCostForDate, deleteTransaction, exportBackupJSON, getReflectionTags } from '../services/storageService';
+import {
+  getTransactions,
+  getCategories,
+  getDailyCostForDate,
+  deleteTransaction,
+  exportBackupJSON,
+  getReflectionTags,
+  getTransactionContributionForDate,
+  isTransactionActiveOnDate,
+} from '../services/storageService';
 import { Transaction, Category, ReflectionTag } from '../types';
 import { Card, ListItem, FloatingActionButton } from '../components/ui';
 import { Trash2, Search, XCircle, Plus, Download, ChevronDown, Check } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip, Cell, ReferenceLine } from 'recharts';
 import AddTransactionModal from '../components/AddTransactionModal';
-import { normalizeReflectionTagIds, deriveReflectionFromTransaction } from '../utils/reflection';
+import { normalizeReflectionTagIds } from '../utils/reflection';
 import { NotificationBell } from '../components/NotificationCenter';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { evaluateDailyLimitRules } from '../services/notificationRules';
 import { applyNotificationDelta } from '../services/notificationRuntime';
-
-const REFLECTION_FILTER_PREFIX = 'reflection:';
-const REFLECTION_FLAG_PREFIX = 'reflectionFlag:';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -98,9 +104,7 @@ const HomePage: React.FC = () => {
   const selectedDate = dateFilter || todayStr;
 
   const todaySpend = useMemo(() => {
-    return transactions
-      .filter(tx => tx.date === todayStr)
-      .reduce((sum, tx) => sum + tx.amount, 0);
+    return transactions.reduce((sum, tx) => sum + getTransactionContributionForDate(tx, todayStr), 0);
   }, [transactions, todayStr]);
 
   const chartData = useMemo(() => {
@@ -131,9 +135,7 @@ const HomePage: React.FC = () => {
   }, [transactions, timeframe, settings.language]);
 
   const cashFlowForSelected = useMemo(() => {
-    return transactions
-      .filter(t => t.date === selectedDate)
-      .reduce((sum, t) => sum + t.amount, 0);
+    return transactions.reduce((sum, tx) => sum + getTransactionContributionForDate(tx, selectedDate), 0);
   }, [transactions, selectedDate]);
 
   const dailyLimit = useMemo(() => {
@@ -299,7 +301,7 @@ const HomePage: React.FC = () => {
     
     if (!matchesSearch) return false;
 
-    if (dateFilter && tx.date !== dateFilter) return false;
+    if (dateFilter && !isTransactionActiveOnDate(tx, dateFilter)) return false;
 
     if (longTermOnly && !tx.endDate) return false;
 

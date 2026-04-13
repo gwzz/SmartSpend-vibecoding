@@ -1,11 +1,11 @@
-import React, { useEffect, lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { House, ChartPie, Settings as SettingsIcon } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react';
 import { SettingsProvider, useSettings } from './contexts/SettingsContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
-import { initStoragePersistence } from './services/storageService';
+import { isSupabaseConfigured } from './services/supabase';
 
 const HomePage = lazy(() => import('./pages/Home'));
 const LandingPage = lazy(() => import('./pages/Landing'));
@@ -63,11 +63,6 @@ const Layout: React.FC = () => {
   const location = useLocation();
   // Only show bottom nav on main tabs on mobile
   const showNav = ['/', '/stats', '/settings'].includes(location.pathname);
-
-  // Init data on mount (AuthContext handles session check first)
-  useEffect(() => {
-    initStoragePersistence();
-  }, []);
 
   return (
     <>
@@ -171,6 +166,10 @@ const Layout: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  if (!isSupabaseConfigured) {
+    return <SupabaseSetupScreen />;
+  }
+
   return (
     <AuthProvider>
       <SettingsProvider>
@@ -192,6 +191,37 @@ const App: React.FC = () => {
         </NotificationsProvider>
       </SettingsProvider>
     </AuthProvider>
+  );
+};
+
+const SupabaseSetupScreen: React.FC = () => {
+  return (
+    <div className="min-h-screen bg-brand-canvas text-brand-ink px-6 py-10 flex items-center justify-center">
+      <div className="w-full max-w-2xl bg-white border border-brand-border rounded-3xl shadow-soft p-8 md:p-10">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-brand-primary text-white flex items-center justify-center text-2xl">
+            $
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Connect SmartSpend to Supabase</h1>
+            <p className="text-sm text-brand-muted mt-1">The app is ready, but this environment is missing its Supabase settings.</p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-brand-surface border border-brand-border p-5">
+          <p className="text-sm text-brand-muted mb-3">Create a `.env.local` file in the project root with:</p>
+          <pre className="bg-slate-950 text-slate-100 rounded-2xl p-4 text-sm overflow-x-auto">
+{`VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key`}
+          </pre>
+          <p className="text-sm text-brand-muted mt-3">After saving the file, restart the dev server so Vite can load the new environment variables.</p>
+        </div>
+
+        <div className="mt-6 text-sm text-brand-muted">
+          <p>The app now blocks startup instead of silently falling back to a shared backend, which keeps local and preview environments from writing to the wrong Supabase project.</p>
+        </div>
+      </div>
+    </div>
   );
 };
 

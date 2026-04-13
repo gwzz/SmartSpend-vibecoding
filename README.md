@@ -29,9 +29,9 @@ SmartSpend is a Supabase-backed household expense tracker built with React, Type
 2. Create `.env.local` in the project root and add your Supabase credentials
    ```bash
    VITE_SUPABASE_URL=your-project-url
-   VITE_SUPABASE_ANON_KEY=your-public-anon-key
+   VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
    ```
-   The app currently falls back to hardcoded credentials if these are missing; override them with your own keys in all environments.
+   SmartSpend now fails fast when these values are missing so a misconfigured environment does not write to the wrong Supabase project.
 3. Start the dev server
    ```bash
    npm run dev
@@ -171,8 +171,12 @@ The app seeds default reflection tags for a user if none exist; adjust the seed 
 The `Settings` page lets users switch language and currency; translations live in `locales.ts`, and formatting is handled by `SettingsContext`.
 
 ## Troubleshooting
-- Make sure `.env.local` is loaded before running `npm run dev` so the app does not fall back to the hardcoded Supabase keys.
+- Make sure `.env.local` is loaded before running `npm run dev`. If the env vars are missing, the app will stop at startup with a clear error.
 - If auth succeeds but data is empty, verify that your tables exist and RLS policies allow the signed-in user to read/write their rows.
+
+## Supabase Updates
+- Database update scripts live in [supabase/migrations](C:/Users/zhuw2/study/SmartSpend-vibecoding/supabase/migrations).
+- Apply the guardrail migration before rolling out the app changes so invalid amortization ranges are rejected consistently.
 
 ## Deployment Notes
 - The app uses `HashRouter` for routing, so static hosting (e.g., Vercel static export) works without additional rewrite rules.

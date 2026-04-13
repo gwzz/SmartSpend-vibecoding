@@ -9,6 +9,8 @@ const getUserId = async () => {
   return session?.user?.id;
 };
 
+const buildSeedRecordId = (userId: string, seedId: string) => `${userId}:${seedId}`;
+
 // --- Initialization ---
 // Checks if the user has data. If not, seeds the database with initial categories and members.
 export const initStoragePersistence = async () => {
@@ -25,7 +27,7 @@ export const initStoragePersistence = async () => {
     if (!memberError && (memberCount === null || memberCount === 0)) {
        console.log("Seeding default members...");
        const initMembers = INITIAL_MEMBERS.map(m => ({
-           id: m.id,
+           id: buildSeedRecordId(userId, m.id),
            user_id: userId,
            name: m.name,
            avatar: m.avatar
@@ -43,7 +45,7 @@ export const initStoragePersistence = async () => {
     if (!catError && (catCount === null || catCount === 0)) {
         console.log("Seeding default categories...");
         const initCats = INITIAL_CATEGORIES.map(c => ({
-            id: c.id,
+            id: buildSeedRecordId(userId, c.id),
             user_id: userId,
             name: c.name,
             icon: c.icon,
@@ -62,7 +64,7 @@ export const initStoragePersistence = async () => {
     if (!tagError && (tagCount === null || tagCount === 0)) {
         console.log("Seeding default reflection tags...");
         const initTags = DEFAULT_REFLECTION_TAGS.map(t => ({
-            id: t.id,
+            id: buildSeedRecordId(userId, t.id),
             user_id: userId,
             name: t.name,
             color: t.color,
@@ -560,6 +562,7 @@ export const exportBackupJSON = async () => {
         transactions: await getTransactions(),
         categories: await getCategories(),
         members: await getMembers(),
+        reflectionTags: await getReflectionTags(),
         settings: await getSettings()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -580,27 +583,36 @@ const parseDateToUTC = (dateStr: string): number => {
     return Date.UTC(year, month - 1, day);
 };
 
-export const getDailyCostForDate = (dateStr: string, transactions: Transaction[]): number => {
+export const isTransactionActiveOnDate = (tx: Transaction, dateStr: string): boolean => {
     const targetTime = parseDateToUTC(dateStr);
-    if (Number.isNaN(targetTime)) return 0;
+    const startTime = parseDateToUTC(tx.date);
 
+    if (Number.isNaN(targetTime) || Number.isNaN(startTime)) return false;
+
+    if (!tx.endDate) return startTime === targetTime;
+
+    const endTime = parseDateToUTC(tx.endDate);
+    if (Number.isNaN(endTime) || endTime < startTime) return false;
+
+    return targetTime >= startTime && targetTime <= endTime;
+};
+
+export const getTransactionContributionForDate = (tx: Transaction, dateStr: string): number => {
+    if (!isTransactionActiveOnDate(tx, dateStr)) return 0;
+
+    if (!tx.endDate) return tx.amount;
+
+    const days = getDaysDiff(tx.date, tx.endDate);
+    if (days <= 0) return 0;
+
+    return tx.amount / days;
+};
+
+export const getDailyCostForDate = (dateStr: string, transactions: Transaction[]): number => {
     let total = 0;
 
     transactions.forEach(tx => {
-        const startTime = parseDateToUTC(tx.date);
-        if (Number.isNaN(startTime)) return;
-
-        if (tx.endDate) {
-            const endTime = parseDateToUTC(tx.endDate);
-            if (Number.isNaN(endTime)) return;
-
-            if (targetTime >= startTime && targetTime <= endTime) {
-                const days = Math.max(1, getDaysDiff(tx.date, tx.endDate));
-                total += tx.amount / days;
-            }
-        } else if (startTime === targetTime) {
-            total += tx.amount;
-        }
+        total += getTransactionContributionForDate(tx, dateStr);
     });
 
     return total;
@@ -610,8 +622,9 @@ export const getDaysDiff = (start: string, end: string): number => {
     const startTime = parseDateToUTC(start);
     const endTime = parseDateToUTC(end);
     if (Number.isNaN(startTime) || Number.isNaN(endTime)) return 1;
+    if (endTime < startTime) return 0;
 
-    const diff = Math.abs(endTime - startTime);
+    const diff = endTime - startTime;
     return Math.floor(diff / MS_PER_DAY) + 1;
 };
 

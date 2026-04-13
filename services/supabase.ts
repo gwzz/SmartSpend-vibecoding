@@ -24,12 +24,22 @@ const getEnv = (key: string, viteKey: string): string => {
   return '';
 };
 
-// Prioritize Environment Variables, fallback to provided hardcoded credentials
-const supabaseUrl = getEnv('REACT_APP_SUPABASE_URL', 'VITE_SUPABASE_URL') || 'https://hkpclanwaxalolzopich.supabase.co';
-const supabaseAnonKey = getEnv('REACT_APP_SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY') || 'sb_publishable_GwFkmFXDVS3h-N28R1fLNQ_fV72K0_6';
+const supabaseUrl = getEnv('REACT_APP_SUPABASE_URL', 'VITE_SUPABASE_URL');
+const supabasePublishableKey =
+  getEnv('REACT_APP_SUPABASE_PUBLISHABLE_KEY', 'VITE_SUPABASE_PUBLISHABLE_KEY') ||
+  getEnv('REACT_APP_SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY');
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabasePublishableKey);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("Supabase credentials missing. App authentication and storage will not work.");
-}
+const missingConfigMessage =
+  'Missing Supabase environment variables. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY before starting SmartSpend.';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabasePublishableKey)
+  : new Proxy(
+      {},
+      {
+        get() {
+          throw new Error(missingConfigMessage);
+        },
+      }
+    );
